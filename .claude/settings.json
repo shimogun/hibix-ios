@@ -60,7 +60,12 @@
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "if [[ \"$CLAUDE_FILE_PATH\" == *.swift ]]; then swiftformat \"$CLAUDE_FILE_PATH\" >/dev/null 2>&1 && swiftlint lint --quiet \"$CLAUDE_FILE_PATH\" 2>&1 || true; fi"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATH\" == *.swift ]]; then swiftformat \"$CLAUDE_FILE_PATH\" >/dev/null 2>&1 && swiftlint lint --quiet \"$CLAUDE_FILE_PATH\" 2>&1 || true; fi"
+          }
+        ]
       }
     ]
   }
