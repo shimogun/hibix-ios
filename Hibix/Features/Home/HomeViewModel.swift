@@ -6,14 +6,19 @@ import os.log
 @Observable
 final class HomeViewModel {
     private(set) var calendarEntries: [String: MoodEntry] = [:]
+    private(set) var earliestEntryDate: Date?
     private(set) var lastErrorMessage: String?
     private(set) var isSaving: Bool = false
     var isMemoSheetPresented: Bool = false
+    var isPaywallPresented: Bool = false
     var selectedDetailDate: String?
 
     private let repository: any MoodEntryRepositoryProtocol
     private let checkinService: CheckinService?
     private let now: @Sendable () -> Date
+
+    /// 過去エントリ読み込み用のセンチネル。1970-01-01 を起点にすれば実質「全期間」。
+    nonisolated static let allHistoryEarliestDate = "1970-01-01"
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Home")
 
@@ -29,12 +34,13 @@ final class HomeViewModel {
         calendarEntries[HibixDate.todayString(now: now())]
     }
 
-    func load() async {
+    func load(isPro: Bool) async {
         let today = HibixDate.todayString(now: now())
-        let earliest = HibixDate.dayString(offsetDays: -364, from: now())
+        let earliest = isPro ? Self.allHistoryEarliestDate : HibixDate.dayString(offsetDays: -364, from: now())
         do {
             let entries = try await repository.entries(from: earliest, to: today)
             calendarEntries = Dictionary(uniqueKeysWithValues: entries.map { ($0.entryDate, $0) })
+            earliestEntryDate = Self.firstEntryDate(in: entries)
             lastErrorMessage = nil
         } catch {
             lastErrorMessage = error.localizedDescription
@@ -55,6 +61,7 @@ final class HomeViewModel {
                                                     memo: preservedMemo,
                                                     now: tapAt)
             calendarEntries[date] = entry
+            updateEarliestEntryDateOnInsert(entry: entry)
             lastErrorMessage = nil
             isMemoSheetPresented = true
             Self.logger.info("Recorded mood level=\(level.rawValue, privacy: .public) date=\(date, privacy: .public)")
@@ -87,6 +94,10 @@ final class HomeViewModel {
         isMemoSheetPresented = false
     }
 
+    func presentPaywall() {
+        isPaywallPresented = true
+    }
+
     func editEntry(date: String, level: MoodLevel, memo: String?) async {
         guard date <= HibixDate.todayString(now: now()) else {
             lastErrorMessage = "未来日は記録できません"
@@ -98,11 +109,37 @@ final class HomeViewModel {
                                                     memo: memo,
                                                     now: now())
             calendarEntries[date] = entry
+            updateEarliestEntryDateOnInsert(entry: entry)
             lastErrorMessage = nil
             Self.logger.info("Edited entry date=\(date, privacy: .public) level=\(level.rawValue, privacy: .public)")
         } catch {
             lastErrorMessage = error.localizedDescription
             Self.logger.error("Edit entry failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    // MARK: - Private helpers
+
+    private func updateEarliestEntryDateOnInsert(entry: MoodEntry) {
+        guard let entryDate = Self.parseEntryDate(entry.entryDate) else { return }
+        if let current = earliestEntryDate {
+            if entryDate < current { earliestEntryDate = entryDate }
+        } else {
+            earliestEntryDate = entryDate
+        }
+    }
+
+    nonisolated private static func firstEntryDate(in entries: [MoodEntry]) -> Date? {
+        let dates = entries.compactMap { parseEntryDate($0.entryDate) }
+        return dates.min()
+    }
+
+    nonisolated private static func parseEntryDate(_ raw: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: raw)
     }
 }

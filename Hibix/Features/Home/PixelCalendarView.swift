@@ -3,41 +3,83 @@ import SwiftUI
 struct PixelCalendarView: View {
     let today: Date
     let entries: [String: MoodEntry]
+    let isPro: Bool
+    let earliestEntryDate: Date?
     let onSelectDate: (String) -> Void
+    let onUpgradeRequest: () -> Void
 
     private static let cellSize: CGFloat = 32
     private static let cellSpacing: CGFloat = 4
     private static let monthHeaderHeight: CGFloat = 18
+    private static let upgradeStripWidth: CGFloat = 96
 
     private let geometry: PixelCalendarGeometry
 
     init(today: Date,
          entries: [String: MoodEntry],
+         isPro: Bool,
+         earliestEntryDate: Date?,
          calendar: Calendar = .current,
-         onSelectDate: @escaping (String) -> Void) {
+         onSelectDate: @escaping (String) -> Void,
+         onUpgradeRequest: @escaping () -> Void) {
         self.today = today
         self.entries = entries
-        self.geometry = PixelCalendarGeometry(today: today, calendar: calendar)
+        self.isPro = isPro
+        self.earliestEntryDate = earliestEntryDate
+        self.geometry = PixelCalendarGeometry(
+            today: today,
+            calendar: calendar,
+            earliestEntryDate: earliestEntryDate,
+            isPro: isPro
+        )
         self.onSelectDate = onSelectDate
+        self.onUpgradeRequest = onUpgradeRequest
     }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 4) {
-                monthHeader
-                grid
+            HStack(alignment: .top, spacing: Self.cellSpacing) {
+                if !isPro {
+                    upgradeStrip
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    monthHeader
+                    grid
+                }
             }
             .padding(.vertical, 4)
             .padding(.horizontal, 4)
         }
         .defaultScrollAnchor(.trailing)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("ピクセルカレンダー、直近365日")
+        .accessibilityLabel(isPro ? "ピクセルカレンダー、全期間" : "ピクセルカレンダー、直近365日")
+    }
+
+    private var upgradeStrip: some View {
+        Button(action: onUpgradeRequest) {
+            VStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                Text("全期間を見る")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(width: Self.upgradeStripWidth,
+                   height: CGFloat(PixelCalendarGeometry.rowCount) * Self.cellSize
+                        + CGFloat(PixelCalendarGeometry.rowCount - 1) * Self.cellSpacing
+                        + Self.monthHeaderHeight + 4)
+            .background(Color(uiColor: .secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Pro にアップグレードして全期間を表示")
     }
 
     private var monthHeader: some View {
         HStack(alignment: .bottom, spacing: Self.cellSpacing) {
-            ForEach(0..<PixelCalendarGeometry.columnCount, id: \.self) { col in
+            ForEach(0..<geometry.columnCount, id: \.self) { col in
                 Color.clear
                     .frame(width: Self.cellSize, height: Self.monthHeaderHeight)
                     .overlay(alignment: .topLeading) {
@@ -67,7 +109,7 @@ struct PixelCalendarView: View {
 
     private var grid: some View {
         HStack(alignment: .top, spacing: Self.cellSpacing) {
-            ForEach(0..<PixelCalendarGeometry.columnCount, id: \.self) { col in
+            ForEach(0..<geometry.columnCount, id: \.self) { col in
                 VStack(spacing: Self.cellSpacing) {
                     ForEach(0..<PixelCalendarGeometry.rowCount, id: \.self) { row in
                         cellView(col: col, row: row)
@@ -118,6 +160,11 @@ private struct CalendarCell: View {
 }
 
 #Preview {
-    PixelCalendarView(today: Date(), entries: [:], onSelectDate: { _ in })
+    PixelCalendarView(today: Date(),
+                      entries: [:],
+                      isPro: false,
+                      earliestEntryDate: nil,
+                      onSelectDate: { _ in },
+                      onUpgradeRequest: {})
         .padding()
 }

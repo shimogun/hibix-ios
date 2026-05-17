@@ -28,7 +28,7 @@ struct HomeViewModelTests {
     func load_returnsEmptyWhenNoEntries() async throws {
         let fixed = try makeDate(year: 2026, month: 5, day: 17)
         let (viewModel, _) = try makeViewModel(fixedDate: fixed)
-        await viewModel.load()
+        await viewModel.load(isPro: false)
         #expect(viewModel.todayEntry == nil)
         #expect(viewModel.lastErrorMessage == nil)
     }
@@ -61,7 +61,7 @@ struct HomeViewModelTests {
                                         level: .good,
                                         memo: "事前メモ",
                                         now: fixed)
-        await viewModel.load()
+        await viewModel.load(isPro: false)
         await viewModel.recordMood(.uplift)
         #expect(viewModel.todayEntry?.memo == "事前メモ")
         #expect(viewModel.todayEntry?.moodLevel == MoodLevel.uplift.rawValue)
@@ -95,7 +95,7 @@ struct HomeViewModelTests {
                                         level: .good,
                                         memo: "事前メモ",
                                         now: fixed)
-        await viewModel.load()
+        await viewModel.load(isPro: false)
         await viewModel.saveMemo("   ")
         #expect(viewModel.todayEntry?.memo == nil)
     }
@@ -139,7 +139,7 @@ struct HomeViewModelTests {
                                         level: .down,
                                         memo: "古いメモ",
                                         now: fixed)
-        await viewModel.load()
+        await viewModel.load(isPro: false)
         await viewModel.editEntry(date: "2026-05-10", level: .best, memo: "新しいメモ")
         let entry = viewModel.calendarEntries["2026-05-10"]
         #expect(entry?.moodLevel == MoodLevel.best.rawValue)
@@ -163,7 +163,7 @@ struct HomeViewModelTests {
                                         level: .calm,
                                         memo: nil,
                                         now: fixed)
-        await viewModel.load()
+        await viewModel.load(isPro: false)
         #expect(viewModel.todayEntry?.moodLevel == MoodLevel.calm.rawValue)
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import StoreKit
 import UserNotifications
 import os.log
 
@@ -16,6 +17,8 @@ final class AppDependencies {
     let apiClient: APIClient
     let appAttestClient: AppAttestClient
     let checkinService: CheckinService
+    let entitlementManager: EntitlementManager
+    let storeKitVerifyService: StoreKitVerifyService
 
     /// オンボーディング完了済みか。未ロード時は nil（RootView は読み込み待ち画面を出す）。
     private(set) var onboardingDone: Bool?
@@ -70,6 +73,16 @@ final class AppDependencies {
             attest: attestClient
         )
 
+        let verifyService = StoreKitVerifyService(apiClient: apiClient, attest: attestClient)
+        self.storeKitVerifyService = verifyService
+
+        self.entitlementManager = EntitlementManager(
+            keychain: store,
+            onVerifyTransaction: { @Sendable [weak verifyService] transaction in
+                await verifyService?.verify(transaction)
+            }
+        )
+
         Self.logger.info("AppDependencies bootstrapped")
     }
 
@@ -79,6 +92,7 @@ final class AppDependencies {
     /// - 朝/夜通知の予約状態を整える
     /// - App Attest 登録(未登録のみ初回)
     /// - 未送信 checkin の resync
+    /// - Entitlement 復元 + Transaction.updates 監視開始
     func warmUp() async {
         UNUserNotificationCenter.current().delegate = notificationDelegateAdapter
         do {
@@ -88,6 +102,8 @@ final class AppDependencies {
             onboardingDone = false
         }
         await notificationScheduler.rescheduleDailyNotifications()
+
+        await entitlementManager.warmUp()
 
         // App Attest 登録は backend 疎通を伴うため、失敗してもアプリ起動を阻害しない。
         let registered = await appAttestClient.ensureRegistered()

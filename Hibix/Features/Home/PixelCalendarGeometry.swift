@@ -2,28 +2,53 @@ import Foundation
 
 struct PixelCalendarGeometry: Sendable {
     static let rowCount: Int = 7
-    static let columnCount: Int = 53
-    static let windowDays: Int = 365
+    static let defaultColumnCount: Int = 53
+    static let defaultWindowDays: Int = 365
+    static let minimumColumnCount: Int = 53
 
     let today: Date
     let calendar: Calendar
     let startOfTodayDay: Date
     let earliestVisibleDay: Date
+    let columnCount: Int
 
-    init(today: Date, calendar: Calendar = .current) {
+    init(today: Date,
+         calendar: Calendar = .current,
+         earliestEntryDate: Date? = nil,
+         isPro: Bool = false) {
         self.today = today
         self.calendar = calendar
         let startOfTodayDay = calendar.startOfDay(for: today)
         self.startOfTodayDay = startOfTodayDay
-        self.earliestVisibleDay = calendar.date(byAdding: .day,
-                                                value: -(Self.windowDays - 1),
-                                                to: startOfTodayDay) ?? startOfTodayDay
+
+        if isPro {
+            // 有料: 最古エントリ(またはデフォルト365日)から今日までを含むよう列数を計算
+            let earliestCandidate = earliestEntryDate.map { calendar.startOfDay(for: $0) }
+            let earliest: Date
+            if let earliestCandidate, earliestCandidate <= startOfTodayDay {
+                earliest = earliestCandidate
+            } else {
+                earliest = calendar.date(byAdding: .day,
+                                         value: -(Self.defaultWindowDays - 1),
+                                         to: startOfTodayDay) ?? startOfTodayDay
+            }
+            self.earliestVisibleDay = earliest
+            let days = (calendar.dateComponents([.day], from: earliest, to: startOfTodayDay).day ?? 0) + 1
+            let weeks = (days + Self.rowCount - 1) / Self.rowCount
+            self.columnCount = max(Self.minimumColumnCount, weeks)
+        } else {
+            // 無料: 365 日ローリングウィンドウ固定
+            self.earliestVisibleDay = calendar.date(byAdding: .day,
+                                                    value: -(Self.defaultWindowDays - 1),
+                                                    to: startOfTodayDay) ?? startOfTodayDay
+            self.columnCount = Self.defaultColumnCount
+        }
     }
 
-    /// 指定 (column, row) のセルが表現する日付。column 0 = 52週前、column 52 = 当週。
-    /// row 0 = 当該週の先頭日（Calendar.firstWeekday に従う）、row 6 = 末尾日。
+    /// 指定 (column, row) のセルが表現する日付。column 0 = 最古列、column (columnCount-1) = 当週。
+    /// row 0 = 当該週の先頭日(Calendar.firstWeekday に従う)、row 6 = 末尾日。
     func date(forColumn col: Int, row: Int) -> Date {
-        let weeksAgo = (Self.columnCount - 1) - col
+        let weeksAgo = (columnCount - 1) - col
         let weekdayIndex = weekdayIndex(of: startOfTodayDay)
         guard let startOfCurrentWeek = calendar.date(byAdding: .day,
                                                     value: -weekdayIndex,

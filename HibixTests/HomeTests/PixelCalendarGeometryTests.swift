@@ -24,7 +24,7 @@ struct PixelCalendarGeometryTests {
     func todayCell_isAtRightmostColumnOnTodayWeekdayRow() throws {
         let today = try date(year: 2026, month: 5, day: 17) // 2026-05-17 is Sunday
         let geom = PixelCalendarGeometry(today: today, calendar: sundayStartCalendar)
-        let dateAtTodayCell = geom.date(forColumn: PixelCalendarGeometry.columnCount - 1, row: 0)
+        let dateAtTodayCell = geom.date(forColumn: geom.columnCount - 1, row: 0)
         #expect(geom.isSameDay(dateAtTodayCell, today))
     }
 
@@ -78,7 +78,52 @@ struct PixelCalendarGeometryTests {
         let today = try date(year: 2026, month: 5, day: 14) // 2026-05-14 is Thursday
         let geom = PixelCalendarGeometry(today: today, calendar: sundayStartCalendar)
         // Sunday=0, Mon=1, Tue=2, Wed=3, Thu=4
-        let cell = geom.date(forColumn: PixelCalendarGeometry.columnCount - 1, row: 4)
+        let cell = geom.date(forColumn: geom.columnCount - 1, row: 4)
         #expect(geom.isSameDay(cell, today))
+    }
+
+    @Test
+    func freeUser_alwaysUsesDefaultColumnCount() throws {
+        let today = try date(year: 2026, month: 5, day: 17)
+        let veryOld = try date(year: 2020, month: 1, day: 1)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: veryOld,
+                                         isPro: false)
+        #expect(geom.columnCount == PixelCalendarGeometry.defaultColumnCount)
+        #expect(!geom.isInVisibleWindow(veryOld))
+    }
+
+    @Test
+    func proUser_extendsColumnCountForOlderEntries() throws {
+        let today = try date(year: 2026, month: 5, day: 17)
+        let twoYearsAgo = try date(year: 2024, month: 5, day: 17)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: twoYearsAgo,
+                                         isPro: true)
+        #expect(geom.columnCount > PixelCalendarGeometry.defaultColumnCount)
+        #expect(geom.isInVisibleWindow(twoYearsAgo))
+    }
+
+    @Test
+    func proUser_withNoEntries_fallsBackToDefault() throws {
+        let today = try date(year: 2026, month: 5, day: 17)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: nil,
+                                         isPro: true)
+        #expect(geom.columnCount == PixelCalendarGeometry.defaultColumnCount)
+    }
+
+    @Test
+    func proUser_withVeryRecentEntry_keepsMinimumColumnCount() throws {
+        let today = try date(year: 2026, month: 5, day: 17)
+        let yesterday = try date(year: 2026, month: 5, day: 16)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: yesterday,
+                                         isPro: true)
+        #expect(geom.columnCount >= PixelCalendarGeometry.minimumColumnCount)
     }
 }

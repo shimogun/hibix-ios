@@ -3,14 +3,19 @@ import SwiftUI
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
     @State private var isMoodPickerSheetPresented: Bool = false
+    @Bindable private var entitlement: EntitlementManager
     private let notificationTapCoordinator: NotificationTapCoordinator
+    private let makePaywallViewModel: () -> PaywallViewModel
 
     init(dependencies: AppDependencies) {
         _viewModel = State(initialValue: HomeViewModel(
             repository: dependencies.moodEntryRepository,
             checkinService: dependencies.checkinService
         ))
+        self.entitlement = dependencies.entitlementManager
         self.notificationTapCoordinator = dependencies.notificationTapCoordinator
+        let manager = dependencies.entitlementManager
+        self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
     }
 
     var body: some View {
@@ -35,8 +40,8 @@ struct HomeView: View {
             .navigationDestination(item: $bindable.selectedDetailDate) { dateString in
                 EntryDetailView(date: dateString, viewModel: viewModel)
             }
-            .task {
-                await viewModel.load()
+            .task(id: entitlement.isPro) {
+                await viewModel.load(isPro: entitlement.isPro)
             }
             .onChange(of: notificationTapCoordinator.lastTapId) { _, newId in
                 guard newId != nil else { return }
@@ -56,6 +61,17 @@ struct HomeView: View {
                     },
                     onSkip: {
                         viewModel.dismissMemoSheet()
+                    }
+                )
+            }
+            .sheet(isPresented: $bindable.isPaywallPresented) {
+                PaywallView(
+                    viewModel: makePaywallViewModel(),
+                    onPurchaseCompleted: {
+                        viewModel.isPaywallPresented = false
+                    },
+                    onDismiss: {
+                        viewModel.isPaywallPresented = false
                     }
                 )
             }
@@ -108,9 +124,15 @@ struct HomeView: View {
 
     private var calendar: some View {
         PixelCalendarView(today: Date(),
-                          entries: viewModel.calendarEntries) { dateString in
-            viewModel.selectedDetailDate = dateString
-        }
+                          entries: viewModel.calendarEntries,
+                          isPro: entitlement.isPro,
+                          earliestEntryDate: viewModel.earliestEntryDate,
+                          onSelectDate: { dateString in
+                              viewModel.selectedDetailDate = dateString
+                          },
+                          onUpgradeRequest: {
+                              viewModel.presentPaywall()
+                          })
     }
 
     private var picker: some View {
