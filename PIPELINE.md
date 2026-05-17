@@ -11,11 +11,11 @@ STEP2: コア記録機能(F-01〜F-04 同一画面群)
    ↓
 STEP3: オンボーディング+通知(F-05)
    ↓
-[Backend STEP7 Codexレビューゲート完了を待つ]
+[Backend STEP7 Codex設計レビューゲート: PRD v2.2.0 / design v0.8 で確定済]
    ↓
-STEP4: APIクライアント+checkin連携(Backend仕様確定後)
+STEP4: iOS S4.3 + S4.5 (APIClient + checkin連携 + App Attestクライアント)
    ↓
-STEP5: 課金+ゲーティング(F-12〜F-14, PaywallView, F-04全期間)
+STEP5: 課金+ゲーティング(F-12〜F-14, PaywallView, F-04全期間, /api/storekit/verify連携)
    ↓ ✅ 承認2(Sandbox購入確認)
 STEP6: 設定+有料機能UI(F-06〜F-08)
    ↓
@@ -56,8 +56,8 @@ Fork-Join可能(共有状態なし・独立ファイル):
 | STEP1 | DatabaseManager / Migrations.swift / KeychainStore.swift + 各ユニットテスト + 起動時にDB作成・UUID発行が動く |
 | STEP2 | HomeView / MoodPickerView / MoodMemoView / EntryDetailView / PixelCalendarView(直近365日) + F-01〜F-04の受け入れ基準クリア |
 | STEP3 | OnboardingFlow / NotificationScheduler + F-05受け入れ基準クリア |
-| STEP4 | APIClient / APIEndpoint / 気分タップ後の POST /api/checkin 連携動作 |
-| STEP5 | StoreKit 2統合 / EntitlementManager / FeatureGate / PaywallView / F-04全期間スクロール + F-12〜F-14受け入れ基準クリア |
+| STEP4 | APIClient / APIEndpoint / APIError / AppAttestClient(DCAppAttestService ラッパー)/ 気分タップ後の POST /api/checkin が wrangler dev に対して動作(PRD v2.2.0 §8.1-§8.2 / §8.7-§8.8 / §10.7) |
+| STEP5 | StoreKit 2統合 / EntitlementManager / FeatureGate / PaywallView / F-04全期間スクロール + F-12〜F-14受け入れ基準クリア + POST /api/storekit/verify による is_pro 確定(C-01) |
 | STEP6 | SettingsView / ModeSwitchView / EmergencyContactsView / AppLockManager + F-06〜F-08受け入れ基準クリア |
 | STEP7 | DataDeletionView / アクセシビリティ仕上げ + F-10/F-11受け入れ基準クリア + Accessibility Inspector 警告ゼロ |
 | STEP8 | ユニット/統合/手動テスト全項目消化 + TestFlightビルドアップロード準備完了 |

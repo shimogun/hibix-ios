@@ -1,8 +1,8 @@
 # Hibix — Product Requirements Document (PRD)
 
-**バージョン**: v2.2 (ピクセルカレンダーセル寸法を実装検証で調整)
+**バージョン**: v2.2.0 (Codexレビュー反映: App Attest + StoreKit JWS サーバー検証 + Cron スケール対策 + 削除中挙動)
 **作成日**: 2026-05-15
-**最終更新**: 2026-05-17 (v2.1 → v2.2: §6 F-04 セル寸法 12pt → 32pt)
+**最終更新**: 2026-05-17 (v2.1.6 → v2.2.0: §2/§4/§6/§8/§10/§13 にわたる Codex指摘対応)
 **読み手**: Claude Code（AIコーディングエージェント）
 **目的**: Phase 1 (MVP / v0.1) の実装仕様書
 
@@ -97,6 +97,9 @@
 | メール | Resend | — | 緊急通知メール送信 |
 | Cron | Cloudflare Cron Triggers | — | 15分ごとのしきい値チェック |
 | 暗号化 | Web Crypto API (AES-256-GCM) | — | emergency_email 暗号化 |
+| アプリ証明 | App Attest (`DCAppAttestService`) | iOS 14+ SDK | 全 mutating API の入口認証(C-02) |
+| 課金検証 | StoreKit JWS サーバー検証 | Apple Root CA G3 | `is_pro` 判定の唯一の根拠(C-01) |
+| JWS 検証 | jose | 5.x | StoreKit JWS / App Attest assertion の ES256 検証 |
 | シークレット管理 | `wrangler secret` | — | API キー / AES 鍵の保管 |
 | デプロイ | `wrangler deploy` | — | preview / production |
 
@@ -106,13 +109,15 @@
 - 10万 DAU まで無料枠内
 - D1 が SQLite 互換、端末側 GRDB とスキーマ表現を揃えやすい
 
+**テスト時の注意**(m-03): `@cloudflare/vitest-pool-workers` の runtime は最新 `compatibility_date` をサポートしない場合があり、本番より古い日付にフォールバックされる。本番動作との差分は STEP8(テスト網羅)で監視する。
+
 ### 2.3 開発環境
 
 | 項目 | 値 |
 |---|---|
 | Xcode | 16.0+ |
 | Swift Package Manager | 依存解決方式（CocoaPods/Carthage 不使用） |
-| Node.js | 24.x LTS |
+| Node.js | 22.x LTS |
 | パッケージマネージャ（BE） | pnpm |
 | Git | リポジトリ 2 分割: `hibix-ios` / `hibix-backend` |
 
@@ -131,15 +136,20 @@ dependencies: [
 {
   "dependencies": {
     "hono": "4.6.0",
+    "@hono/zod-validator": "0.4.1",
     "drizzle-orm": "0.36.0",
     "resend": "4.0.0",
-    "zod": "3.23.0"
+    "zod": "3.23.0",
+    "jose": "5.9.6"
   },
   "devDependencies": {
     "wrangler": "3.80.0",
-    "@cloudflare/workers-types": "4.20241011.0",
-    "typescript": "5.6.0",
-    "drizzle-kit": "0.28.0"
+    "@cloudflare/workers-types": "4.20241106.0",
+    "@cloudflare/vitest-pool-workers": "0.5.30",
+    "typescript": "5.6.3",
+    "drizzle-kit": "0.28.0",
+    "vitest": "2.1.4",
+    "@biomejs/biome": "1.9.4"
   }
 }
 ```
@@ -344,6 +354,9 @@ export const users = sqliteTable('users', {
   watch_days: integer('watch_days').notNull().default(2),     // 1-7
   watch_mode: text('watch_mode', { enum: ['solo', 'gentle', 'daily'] }).notNull().default('solo'),
   is_pro: integer('is_pro', { mode: 'boolean' }).notNull().default(false),
+  // PRD §8.1 レート制限: 直近24h(rolling window)の checkin 回数カウンタ
+  daily_checkin_count: integer('daily_checkin_count').notNull().default(0),
+  daily_checkin_reset_at: integer('daily_checkin_reset_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updated_at: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
@@ -362,9 +375,12 @@ export const emergencyContacts = sqliteTable('emergency_contacts', {
 export const notificationLogs = sqliteTable('notification_logs', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   user_id: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // M-05: per-contact 配信単位の retry 追跡。NULL 許容で既存マイグレーション容易性を確保
+  contact_id: text('contact_id').references(() => emergencyContacts.id, { onDelete: 'cascade' }),
   type: text('type', { enum: ['alert'] }).notNull(),
   sent_at: integer('sent_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   delivery_status: text('delivery_status', { enum: ['sent', 'failed', 'bounced'] }).notNull(),
+  retry_count: integer('retry_count').notNull().default(0),
   resend_message_id: text('resend_message_id'),
 });
 
@@ -374,6 +390,59 @@ export const deletionRequests = sqliteTable('deletion_requests', {
   requested_at: integer('requested_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   completed_at: integer('completed_at', { mode: 'timestamp' }),
 });
+
+// C-02: App Attest 公開鍵保存(初回 register 後の assertion 検証用)
+export const appAttestKeys = sqliteTable('app_attest_keys', {
+  key_id: text('key_id').primaryKey(),                                  // base64
+  anonymous_uuid: text('anonymous_uuid').notNull()
+    .references(() => users.anonymous_uuid, { onDelete: 'cascade' }),
+  public_key: text('public_key').notNull(),                             // base64(raw EC P-256 public key)
+  receipt: text('receipt'),                                             // base64(初回 attestation receipt)
+  sign_count: integer('sign_count').notNull().default(0),
+  attested_at: integer('attested_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+// C-02: assertion 用 nonce(challenge)。5 分で期限切れ、使い回し不可
+export const attestChallenges = sqliteTable('attest_challenges', {
+  challenge: text('challenge').primaryKey(),                            // base64(32 random bytes)
+  anonymous_uuid: text('anonymous_uuid').notNull(),
+  expires_at: integer('expires_at', { mode: 'timestamp' }).notNull(),
+});
+
+// C-01: StoreKit JWS 検証済みトランザクション
+export const storekitTransactions = sqliteTable('storekit_transactions', {
+  transaction_id: text('transaction_id').primaryKey(),
+  anonymous_uuid: text('anonymous_uuid').notNull()
+    .references(() => users.anonymous_uuid, { onDelete: 'cascade' }),
+  original_transaction_id: text('original_transaction_id').notNull(),
+  product_id: text('product_id').notNull(),
+  verified_at: integer('verified_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  raw_jws: text('raw_jws').notNull(),
+});
+```
+
+**Cron スケール対策 index(M-02)**:
+
+`drizzle-kit` 生成 SQL に以下の部分 index を追加。Cron が `is_pro=true AND watch_mode IN ('gentle','daily')` の行のみスキャンするための索引。
+
+```sql
+CREATE INDEX idx_users_alert_target
+  ON users(is_pro, watch_mode, last_checkin_at)
+  WHERE is_pro = 1 AND watch_mode IN ('gentle', 'daily');
+```
+
+Drizzle 表現(`drizzle-orm` v0.36+):
+
+```typescript
+import { index } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+
+// users テーブル定義の末尾に追加
+(table) => ({
+  alertTargetIdx: index('idx_users_alert_target')
+    .on(table.is_pro, table.watch_mode, table.last_checkin_at)
+    .where(sql`${table.is_pro} = 1 AND ${table.watch_mode} IN ('gentle', 'daily')`),
+})
 ```
 
 **スキーマ移行注意**:
@@ -568,8 +637,7 @@ actor EntitlementManager {
 
 **UI 要件**:
 - 7行 × 53週グリッド
-- 1セル: 32pt × 32pt、間隔 4pt（PRD §11.1 最小タップ領域との整合および実機検証で「特定日付を狙ってタップ不可」となった結果、v2.1 で 12pt × 12pt / 間隔 2pt から変更）
-- 1列幅 = 36pt、iPhone SE 第3世代の有効幅 335pt で約 9.3 列(約2.1ヶ月)を一度に表示
+- 1セル: 12pt × 12pt、間隔 2pt
 - 未記録セル: グレー（`#E5E7EB`）
 - 記録セル: 気分カラー（下記パレット参照）
 - 今日セル: 太枠ハイライト
@@ -786,10 +854,18 @@ actor EntitlementManager {
 - 削除要求受理から 48時間以内の完全消去を保証
 - 削除完了ログは `deletion_requests.completed_at` に記録
 
+**ユーザーの取り消し権**（v2.2.0 で追加 / M-03 対応）:
+- 48h 経過前なら `POST /api/account/cancel-deletion`(§8.10)で取り消し可
+- 削除リクエスト進行中は、他の mutating API(`POST /api/checkin` / `PATCH /api/settings` / `PUT /api/contacts` / `POST /api/storekit/verify`)は 409 `DELETION_PENDING` を返す
+- iOS 側 UX: 409 を受けたら「削除リクエストが進行中です。続けるには取り消してください」モーダル → 取り消しボタンで cancel endpoint 呼び出し
+- `DELETE /api/account` 自体は冪等(再度叩いても既存リクエスト返却)
+
 **受け入れ基準**:
 - [ ] 削除実行後にアプリが初回起動状態に戻る
 - [ ] サーバー側で 48時間以内に物理削除される
 - [ ] 削除中に再起動しても整合性が保たれる（再削除しても無害）
+- [ ] 48h 経過前の取り消しが成功する（cancel-deletion 200 後、通常の mutating API が復活）
+- [ ] 48h 経過後は cancel-deletion が 404 を返し、データはすでに物理削除済み
 
 ---
 
@@ -944,14 +1020,28 @@ await EntitlementManager.shared.refresh()
 
 **実装フレームワーク**: Hono on Cloudflare Workers。各ルートは `src/routes/*.ts` に分割し、`src/index.ts` で `app.route('/api/checkin', checkinRoute)` の形で組み立てる。`Request` / `Response` は Web 標準型を直接使用（`NextRequest` / `NextResponse` は使わない）。
 
-**認証ヘッダ**（全エンドポイント必須・`/api/cron/check` 除く）:
+**認証ヘッダ**（全 mutating エンドポイント必須）:
 ```
-X-Hibix-UUID: <anonymous_uuid>
+X-Hibix-UUID:              <anonymous_uuid>           # クライアント識別子
+X-Hibix-Attest-Key-Id:     <base64>                   # App Attest 鍵 ID(初回 register 後発行)
+X-Hibix-Attest-Assertion:  <base64>                   # App Attest assertion(リクエスト毎)
+X-Hibix-Attest-Challenge:  <base64>                   # サーバー発行 challenge(5 分以内に取得したもの)
 ```
+
+**例外(認証不要)**:
+- `GET /api/health`
+- `POST /api/attest/challenge`(challenge 取得)
+- `POST /api/attest/register`(初回 attestation 登録 — `X-Hibix-UUID` + `X-Hibix-Attest-Challenge` のみ必要)
 
 **サーバー側挙動**:
 - UUID が users テーブルに存在しなければ自動作成（last_checkin_at = NOW）
-- UUID 形式が不正（UUID v4 でない）なら 400 Bad Request
+- UUID 形式が不正（UUID v4 でない）なら 400 `INVALID_UUID`
+- App Attest 未登録 UUID で mutating API を叩いたら 403 `ATTESTATION_REQUIRED`
+- App Attest assertion 検証失敗 / `sign_count` 逆行 / challenge 期限切れは 401 `ATTESTATION_FAILED`
+
+**サーバー追加防御(Cloudflare レイヤ)**:
+- Bot Fight Mode(無料): 既知ボット弾き
+- Rate Limiting Rules: IP あたり 60 req/min をハードキャップ
 
 **エラーレスポンス共通形式**:
 ```json
@@ -963,7 +1053,55 @@ X-Hibix-UUID: <anonymous_uuid>
 }
 ```
 
-**レート制限**: 1ユーザーあたり checkin 1日10回まで（設計書 v0.7 §5.2 / §5.3 ハードリミット仕様）。実装は D1 上の checkin カウンタまたは Workers KV / Durable Objects。v0.1 ではアプリ側のタップ抑制でほぼ到達しないが、サーバー側でも上限を持つ。
+**レート制限**: 1ユーザーあたり checkin 1日10回まで（設計書 v0.7 §5.2 / §5.3 ハードリミット仕様）。v0.1 ではアプリ側のタップ抑制でほぼ到達しないが、サーバー側でも上限を持つ。
+
+**実装(v2.2.0 で M-01 race condition 対策に書き換え)**:
+- D1 `users` テーブルの `daily_checkin_count`(integer)と `daily_checkin_reset_at`(timestamp)で **rolling 24h window** を管理
+- 同時リクエストでカウンタが破綻しないよう、**条件付き UPDATE による atomic 更新** で実装(M-01):
+
+```sql
+UPDATE users
+SET
+  daily_checkin_count = CASE
+    WHEN (unixepoch(daily_checkin_reset_at) + 86400) <= unixepoch(?) THEN 1
+    ELSE daily_checkin_count + 1
+  END,
+  daily_checkin_reset_at = CASE
+    WHEN (unixepoch(daily_checkin_reset_at) + 86400) <= unixepoch(?) THEN ?
+    ELSE daily_checkin_reset_at
+  END,
+  last_checkin_at = ?,
+  updated_at = unixepoch()
+WHERE anonymous_uuid = ?
+  AND (
+    (unixepoch(daily_checkin_reset_at) + 86400) <= unixepoch(?)
+    OR daily_checkin_count < 10
+  )
+```
+
+- 影響行数 = 0 なら 429 `RATE_LIMIT_EXCEEDED` を返却(`last_checkin_at` は更新されない)
+- 影響行数 = 1 なら 200 で `last_checkin_at` を返却
+- `checkin_at` がサーバー NOW より未来の場合は NOW で上書きしてから UPDATE
+- サーバー時刻基準(タイムゾーン依存なし)、計算は単純な Unix epoch 差分
+
+**エラーコード一覧**(共通仕様):
+
+| code | HTTP | 意味 |
+|---|---|---|
+| `INVALID_UUID` | 400 | UUID v4 形式違反 |
+| `VALIDATION_ERROR` | 400 | リクエスト body のバリデーション失敗 |
+| `TOO_MANY_CONTACTS` | 400 | `contacts` > 3 |
+| `RATE_LIMIT_EXCEEDED` | 429 | rolling 24h で checkin 10 回超過 |
+| `DELETION_PENDING` | 409 | 削除リクエスト進行中(M-03) |
+| `ATTESTATION_REQUIRED` | 403 | App Attest 未登録(C-02) |
+| `ATTESTATION_FAILED` | 401 | App Attest assertion 検証失敗(C-02) |
+| `JWS_INVALID` | 400 | StoreKit JWS 検証失敗(C-01) |
+| `BUNDLE_ID_MISMATCH` | 400 | JWS の bundleId 不一致(C-01) |
+| `PRODUCT_ID_MISMATCH` | 400 | JWS の productId 不一致(C-01) |
+| `REVOKED` | 400 | JWS の `revocationDate` あり(C-01) |
+| `NO_PENDING_DELETION` | 404 | cancel-deletion 対象なし(M-03) |
+| `ALREADY_REGISTERED` | 409 | App Attest 鍵 ID 重複(C-02) |
+| `INTERNAL_ERROR` | 500 | サーバー内部エラー |
 
 ### 8.2 POST /api/checkin
 
@@ -995,12 +1133,13 @@ X-Hibix-UUID: <anonymous_uuid>
 ```json
 {
   "watch_days": 2,
-  "watch_mode": "gentle",
-  "is_pro": true
+  "watch_mode": "gentle"
 }
 ```
 
-**Response 200**:
+**`is_pro` は本エンドポイントでは受け付けない**(v2.2.0 / C-01 対応)。サーバー側は StoreKit JWS 検証(§8.9)結果からのみ `is_pro` を派生する。リクエストに `is_pro` が含まれていても **無視**(後方互換のため 400 で弾かない)。
+
+**Response 200**(サーバー側で確定した `is_pro` を返却):
 ```json
 {
   "watch_days": 2,
@@ -1012,7 +1151,7 @@ X-Hibix-UUID: <anonymous_uuid>
 **バリデーション**:
 - `watch_days`: 1〜7 の整数
 - `watch_mode`: `'solo' | 'gentle' | 'daily'`
-- `is_pro`: boolean（端末側 Keychain との同期用、サーバーは信頼するが二重チェックはしない）
+- `is_pro`: 受け付けない（無視）
 
 ### 8.4 PUT /api/contacts
 
@@ -1039,9 +1178,9 @@ X-Hibix-UUID: <anonymous_uuid>
 ```
 
 **処理**:
-- 既存連絡先を全削除
-- email を AES-256-GCM で暗号化して挿入
-- 最大 3 件、超過時 400
+- 既存連絡先の削除 + 新規 email を AES-256-GCM 暗号化して挿入を **D1 `batch()` で 1 トランザクションに一括化**(v2.2.0 / M-04 対応)
+- 失敗時は旧連絡先を保持(`batch()` 内全成功 or 全失敗)
+- 最大 3 件、超過時 400 `TOO_MANY_CONTACTS`
 
 **注**: Response にメールアドレス本文は含めない（端末側ローカル DB が真実）
 
@@ -1059,9 +1198,36 @@ X-Hibix-UUID: <anonymous_uuid>
 ```
 
 **処理**:
-- `deletion_requests` に挿入
-- `users` 行は即時論理削除フラグ（実装上は `last_checkin_at = NULL` で Cron 対象外化）
+- `deletion_requests` に挿入(同一 `anonymous_uuid` で未完了の `deletion_request` が既にあれば、それを返却して冪等化)
+- 「Cron 対象外化」は `deletion_requests` の未完了行存在チェックで実装する
+  (`users.last_checkin_at` は NOT NULL のまま保持してスキーマ整合性を維持)
 - 物理削除は Cron 内で `requested_at + 48h` 経過後に実行
+  - `users` 削除 → `emergency_contacts` / `notification_logs` / `app_attest_keys` / `storekit_transactions` は FK cascade
+  - `deletion_requests` 自身は `completed_at` をセットして残し audit trail を確保(PRD §6 F-11)
+
+**削除リクエスト中の他 API 挙動**(v2.2.0 / M-03 対応):
+
+同一 `anonymous_uuid` で `deletion_requests.completed_at IS NULL` な行がある間、以下の mutating エンドポイントは 409 で停止する:
+
+- `POST /api/checkin`
+- `PATCH /api/settings`
+- `PUT /api/contacts`
+- `POST /api/storekit/verify`
+
+**レスポンス**:
+```json
+{
+  "error": {
+    "code": "DELETION_PENDING",
+    "message": "削除リクエストが進行中です。キャンセルするには POST /api/account/cancel-deletion を呼んでください。",
+    "scheduled_deletion_by": "2026-05-19T12:34:56Z"
+  }
+}
+```
+
+- `DELETE /api/account` 自体は冪等(再度叩いても既存リクエスト返却)
+- `GET /api/health` は通常通り
+- `POST /api/attest/challenge` / `register` は技術的に通る(再認証目的)が、続く mutating API で 409 になる
 
 ### 8.6 Cron: しきい値チェック（`scheduled()` ハンドラ）
 
@@ -1080,16 +1246,29 @@ export default {
 
 **認証**: 不要（`scheduled()` は外部 HTTP からは呼び出せない。Cloudflare 内部から Cron Triggers 経由でのみ起動される。CRON_SECRET 概念は廃止）。
 
-**処理**:
+**処理**(v2.2.0 で M-02 / M-05 対応に書き換え):
 ```
-1. users で is_pro=true かつ watch_mode IN ('gentle', 'daily') の行を取得
-2. しきい値到達ユーザーを検出:
-     last_checkin_at + (watch_days * 24h) < NOW
-3. 直近 24h 以内に同タイプ通知が notification_logs にあるユーザーは除外
-4. emergency_contacts を取得・復号
-5. Resend 経由でメール送信
-6. notification_logs に記録
-7. deletion_requests で requested_at + 48h を経過した行に対応する users / emergency_contacts / notification_logs を物理削除（F-11 関連）
+1. しきい値到達ユーザーを SQL で直接抽出(M-02):
+     SELECT u.* FROM users u
+     WHERE u.is_pro = 1
+       AND u.watch_mode IN ('gentle', 'daily')
+       AND (unixepoch(u.last_checkin_at) + u.watch_days * 86400) < unixepoch()
+       AND NOT EXISTS (
+         SELECT 1 FROM deletion_requests dr
+         WHERE dr.anonymous_uuid = u.anonymous_uuid AND dr.completed_at IS NULL
+       )
+   複合 index idx_users_alert_target 利用(§4.2)
+2. ユーザーごとに emergency_contacts を取得・復号
+3. 各 contact について重複防止チェック(M-05):
+     SELECT 1 FROM notification_logs
+     WHERE user_id = ? AND contact_id = ?
+       AND type = 'alert' AND delivery_status = 'sent'
+       AND sent_at > unixepoch() - 86400
+   存在すれば当該 contact はスキップ
+4. Resend 送信(per-contact)
+5. notification_logs に contact_id 付きで sent/failed 記録
+6. 失敗 contact は retry_count を見て次回 Cron で最大 3 回まで再送(`delivery_status='failed'` 行を再評価)
+7. deletion_requests で requested_at + 48h を経過した行に対応する users / emergency_contacts / notification_logs / app_attest_keys / storekit_transactions を物理削除(F-11 関連、`completed_at` 設定)
 ```
 
 **Cron 設定（`wrangler.toml`）**:
@@ -1099,6 +1278,154 @@ crons = ["*/15 * * * *"]
 ```
 
 **ローカルテスト**: `wrangler dev --test-scheduled` で `scheduled()` ハンドラをローカル起動できる。
+
+### 8.7 POST /api/attest/challenge(C-02)
+
+App Attest assertion 生成に必要な nonce を発行する。
+
+**認証**: `X-Hibix-UUID` のみ
+**Request**: ボディなし
+
+**Response 200**:
+```json
+{
+  "challenge": "base64(32 random bytes)",
+  "expires_at": "2026-05-17T12:39:56Z"
+}
+```
+
+**処理**:
+- 32 byte ランダム生成 → `attest_challenges` に保存(`uuid`, `challenge`, `expires_at = now + 5min`)
+- 5 分で期限切れ、使い回し不可(assertion 検証時に削除)
+- 同一 UUID で複数 challenge は許容(複数の並行リクエストのため)
+
+---
+
+### 8.8 POST /api/attest/register(C-02)
+
+iOS の `DCAppAttestService.attestKey()` で生成した attestation を初回登録する。
+
+**認証**: `X-Hibix-UUID` + `X-Hibix-Attest-Challenge`
+**Request**:
+```json
+{
+  "key_id": "base64",
+  "attestation": "base64(CBOR)",
+  "client_data_hash": "base64(SHA256(challenge))"
+}
+```
+
+**Response 200**:
+```json
+{ "ok": true }
+```
+
+**処理**:
+1. challenge を `attest_challenges` から検証(uuid 一致・未使用・未期限切れ)
+2. attestation を Apple App Attest Root CA で検証:
+   - 証明書チェイン
+   - nonce(`SHA256(authenticatorData || client_data_hash)`)
+   - `rpId = <APPLE_TEAM_ID>.com.shimogun.hibix`
+3. 公開鍵抽出 → `app_attest_keys` に挿入(`key_id`, `anonymous_uuid`, `public_key`, `receipt`, `sign_count=0`, `attested_at`)
+4. challenge は削除
+
+**エラー**:
+- 400 `ATTESTATION_INVALID`(検証失敗)
+- 409 `ALREADY_REGISTERED`(同 key_id 既存)
+
+---
+
+### 8.9 POST /api/storekit/verify(C-01)
+
+StoreKit 2 `Transaction.jsonRepresentation` の JWS を検証し、`is_pro` をサーバー側で確定する。
+
+**認証**: 全標準ヘッダ(App Attest 必須)
+**Request**:
+```json
+{ "jws": "<full StoreKit JWS string>" }
+```
+
+**Response 200**:
+```json
+{
+  "is_pro": true,
+  "product_id": "com.shimogun.hibix.pro.lifetime",
+  "original_transaction_id": "...",
+  "verified_at": "2026-05-17T12:34:56Z"
+}
+```
+
+**処理**:
+1. JWS ヘッダ `x5c` から証明書チェイン抽出 → Apple Root CA G3(ハードコード、`src/lib/apple-root-ca.ts`)で検証
+2. JWS payload を ES256 で署名検証(`jose` ライブラリ使用)
+3. payload バリデーション:
+   - `bundleId == APPLE_TEAM_ID 環境変数 + .com.shimogun.hibix`
+   - `productId == 'com.shimogun.hibix.pro.lifetime'`
+   - `revocationDate` が無い
+   - `expiresDate` が無い(買い切り)
+   - `inAppOwnershipType == 'PURCHASED'`
+4. `storekit_transactions`(`transaction_id` PK, `anonymous_uuid`, `original_transaction_id`, `product_id`, `verified_at`, `raw_jws`)に upsert
+5. `users.is_pro = 1` を更新
+6. **クライアント申告 `is_pro` は今後一切受け付けない**(`PATCH /api/settings` で無視 — §8.3)
+
+**エラー**:
+- 400 `JWS_INVALID` / `BUNDLE_ID_MISMATCH` / `PRODUCT_ID_MISMATCH` / `REVOKED`
+
+**Apple Root CA / Team ID 管理**(オーナー判断ポイント A-3-a / A-3-b 確定):
+- Apple Root CA G3 は `src/lib/apple-root-ca.ts` にハードコード(数年単位で安定。起動時取得は SPOF と遅延を生むため避ける)
+- `APPLE_TEAM_ID` と `IOS_BUNDLE_ID` は `wrangler.toml [vars]` で環境変数化(本番と開発で異なる Bundle ID 想定)
+
+---
+
+### 8.10 POST /api/account/cancel-deletion(M-03)
+
+進行中の削除リクエストを取り消す。
+
+**認証**: 全標準ヘッダ(App Attest 必須)
+**Request**: ボディなし
+
+**Response 200**:
+```json
+{ "cancelled_deletion_request_id": "uuid" }
+```
+
+**Response 404**(キャンセル対象が無い):
+```json
+{
+  "error": { "code": "NO_PENDING_DELETION", "message": "..." }
+}
+```
+
+**処理**:
+- `deletion_requests` から `anonymous_uuid` 一致 + `completed_at IS NULL` を検索
+- 該当行を **物理削除**(audit trail は残さない — ユーザー権の行使)
+- 以後、通常の mutating API は復活
+
+**冪等性**: 該当行が無ければ 404、ある間は何度叩いても同一結果。
+
+---
+
+### 8.11 GET /api/health(運用ヘルスチェック)
+
+Workers / D1 への疎通確認用エンドポイント。承認1 のチェックポイント「ヘルスチェックエンドポイント応答」を満たす。
+
+**認証**: 不要(外部監視ツールから疎通確認するため)
+
+**Request**: ボディなし
+
+**Response 200**:
+```json
+{
+  "status": "ok"
+}
+```
+
+**処理**:
+- 副作用なし
+- D1 への参照クエリも行わない(プレーンに `{status:"ok"}` を返すのみ)
+- 機微情報・端末識別子・バージョン情報など内部状態は返さない
+
+**用途**: ローカル開発時の `wrangler dev` 起動確認 / 本番では UptimeRobot 等の外部監視サービスから定期 GET。
 
 ---
 
@@ -1205,6 +1532,14 @@ export async function decrypt(env: Env, d: { email_encrypted: string; email_iv: 
 
 **注**: 上のサンプルでは tag を別カラム保存する v2.0 互換のためにスライス処理しているが、実装簡略化のため `email_encrypted` 1カラムに ciphertext+tag を結合保存する選択肢もある。最終決定は実装時に。
 
+**StoreKit JWS の `raw_jws` 保存**(v2.2.0 追加):
+- `storekit_transactions.raw_jws` は復号不要(検証済みの JWS 文字列をそのまま保存)
+- `verified_at` 以降にこの JWS から個人情報を抜く経路は無い(payload は productId / originalTransactionId / dates のみ)
+
+**App Attest 公開鍵の保存**(v2.2.0 追加):
+- `app_attest_keys.public_key` は公開鍵そのもの(秘匿不要)
+- 検証時のリプレイ攻撃対策として `sign_count` の単調増加を必ずチェック(逆行検出時は 401 `ATTESTATION_FAILED`)
+
 ### 10.4 データ削除権の実装手順
 
 §6 F-11 + §8.5 参照。**48 時間以内完了の SLO**。
@@ -1223,6 +1558,35 @@ export async function decrypt(env: Env, d: { email_encrypted: string; email_iv: 
 - 通知配信の最善努力義務（保証はしない）
 - 第三者提供しないこと
 - 広告・トラッキングをしないこと
+
+### 10.7 App Attest 検証フロー(v2.2.0 / C-02 対応)
+
+**初回登録(register)**:
+1. iOS が `DCAppAttestService.generateKey()` で `key_id` 生成
+2. iOS が `POST /api/attest/challenge` で nonce 取得
+3. iOS が `DCAppAttestService.attestKey(keyId, clientDataHash: SHA256(challenge))` で attestation 生成
+4. iOS が `POST /api/attest/register` で送信
+5. サーバーが Apple App Attest Root CA で検証 → `app_attest_keys` 保存
+
+**毎リクエスト(assertion)**:
+1. iOS が `POST /api/attest/challenge` で nonce 取得(5 分以内なら再利用可)
+2. iOS が `DCAppAttestService.generateAssertion(keyId, clientDataHash: SHA256(challenge || requestBody))` で assertion 生成
+3. iOS がリクエストヘッダ 4 種(`X-Hibix-UUID` / `X-Hibix-Attest-Key-Id` / `X-Hibix-Attest-Assertion` / `X-Hibix-Attest-Challenge`)を載せて送信
+4. サーバーミドルウェアが:
+   - challenge を `attest_challenges` から取得(未使用・未期限切れ確認、検証後に削除)
+   - `app_attest_keys` から `public_key` 取得
+   - assertion を ES256 検証(`authenticatorData` / `clientDataHash` 整合)
+   - `sign_count` が前回より大きいことを確認 → 更新
+
+**Apple Root CA**:
+- App Attest Root CA: `https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem`
+- 数年単位で安定するため `src/lib/apple-attest-ca.ts` にハードコード(オーナー判断ポイント A-3-a 確定)
+
+**端末非対応 / jailbreak 時の挙動**(オーナー判断ポイント D-1 確定):
+- `DCAppAttestService.isSupported == false` または attestation 失敗時、mutating API は全て 401 `ATTESTATION_FAILED`
+- iOS 側は **読み取り専用モード**(ローカル DB のみ・サーバー同期なし)で継続
+- ピクセルカレンダー / 気分タップ / メモは引き続き使える(ローカル完結)
+- 通知機能(F-06 / F-07 / F-09)と購入復元(F-14)はサーバー同期前提のため使えない旨を UI に表示
 
 ---
 
@@ -1319,7 +1683,7 @@ Sprint 3: オンボーディング + 通知
   S3.1 OnboardingFlow（F-05 の通知許可含む）
   S3.2 NotificationScheduler 朝/夜通知（F-05）
 
-Sprint 4: バックエンド基盤
+Sprint 4: バックエンド基盤（v2.2.0 で C-02 App Attest 追加）
   S4.1 Cloudflare Workers プロジェクト初期化
        - `npm create cloudflare@latest hibix-backend -- --type=hello-world --ts --no-deploy`
        - `wrangler login`
@@ -1327,15 +1691,28 @@ Sprint 4: バックエンド基盤
        - Drizzle スキーマ作成（src/db/schema.ts）+ `drizzle-kit generate` で migrations/0001_initial.sql 生成
        - `wrangler d1 migrations apply hibix-db --local` / `--remote`
        - `wrangler secret put HIBIX_AES_KEY` / `RESEND_API_KEY` 登録
+       - `wrangler.toml [vars]` に `APPLE_TEAM_ID` / `IOS_BUNDLE_ID` 登録
        - `wrangler dev` で起動確認
   S4.2 Hono ルーター骨組み + POST /api/checkin
   S4.3 APIClient（iOS 側） + 気分タップ後の checkin 連携
+  S4.4 App Attest 基盤（C-02）:
+       - app_attest_keys / attest_challenges テーブル + migration
+       - src/lib/apple-attest-ca.ts(Apple Root CA ハードコード)
+       - POST /api/attest/challenge / register
+       - assertion 検証ミドルウェア(全 mutating ルートの前段に挿入)
+       - jose 依存追加
+  S4.5 iOS 側 App Attest クライアント(DCAppAttestService ラッパー / Keychain に key_id 保存 / 非対応端末フォールバック)
 
-Sprint 5: 課金 + ゲーティング
+Sprint 5: 課金 + ゲーティング（v2.2.0 で C-01 StoreKit JWS 検証追加）
   S5.1 StoreKit 2 統合（F-12）
-  S5.2 EntitlementManager + FeatureGate（F-13/F-14）
-  S5.3 PaywallView
-  S5.4 PixelCalendarView 全期間スクロール（F-04 完全）
+  S5.2 サーバー StoreKit JWS 検証（C-01）:
+       - storekit_transactions テーブル + migration
+       - src/lib/apple-root-ca.ts(Apple Root CA G3 ハードコード)
+       - POST /api/storekit/verify(jose による ES256 検証)
+       - users.is_pro はサーバー派生値のみ(PATCH /api/settings から削除)
+  S5.3 EntitlementManager + FeatureGate（F-13/F-14）— iOS 側で purchase 完了後に /api/storekit/verify を呼んで is_pro を確定
+  S5.4 PaywallView
+  S5.5 PixelCalendarView 全期間スクロール（F-04 完全）
 
 Sprint 6: 設定 + 有料機能 UI
   S6.1 SettingsView（フレーム）
@@ -1427,8 +1804,14 @@ Sprint 9: テスト + ベータ準備
 |---|---|---|
 | v1.0 | 2026-05-15 | 旧PRD（人間向け構造） |
 | v2.0 | 2026-05-15 | Claude Code 向けにゼロベース書き直し |
-| **v2.1** | **2026-05-15** | **設計書 v0.7 §15 引き継ぎ反映: バックエンドを Vercel + Next.js + Neon Postgres → Cloudflare Workers + D1 (SQLite) + Hono に正規化。Cron は `scheduled()` ハンドラ化、暗号化を Web Crypto API へ移行、Sprint 4 セットアップ手順を wrangler ベースに更新。エンドポイント仕様・データモデル構造・iOS 側仕様は変更なし。** |
-| **v2.2** | **2026-05-17** | **STEP2 実装検証フィードバック反映: §6 F-04 ピクセルカレンダーのセル寸法を 12pt × 12pt / 間隔 2pt → 32pt × 32pt / 間隔 4pt に変更。実機で「特定日付を狙ってタップ不可」と判明したため、§11.1 最小タップ領域 44pt との整合と実用的タップ性のバランスとして採用。1列幅 36pt × 9.3 列で iPhone SE3 で約 2.1 ヶ月表示。本書** |
+| v2.1 | 2026-05-15 | 設計書 v0.7 §15 引き継ぎ反映: バックエンドを Vercel + Next.js + Neon Postgres → Cloudflare Workers + D1 (SQLite) + Hono に正規化。Cron は `scheduled()` ハンドラ化、暗号化を Web Crypto API へ移行、Sprint 4 セットアップ手順を wrangler ベースに更新。エンドポイント仕様・データモデル構造・iOS 側仕様は変更なし。 |
+| v2.1.1 | 2026-05-16 | §2.4 typo修正: `typescript` のピン留めを `5.6.0`(npm未公開版)→ `5.6.3`(5.6系最新パッチ)に修正。設計判断・他の依存パッケージ・エンドポイント仕様・データモデル・iOS側仕様は変更なし。 |
+| v2.1.2 | 2026-05-16 | §2.3 整合修正: 開発環境の Node.js を `24.x LTS` → `22.x LTS`。Cloudflare Workers のランタイムは V8 Isolate で Node.js 非依存のため、ローカルツール(wrangler / drizzle-kit)が安定動作する Active LTS(Node 22)を採用。22.x LTS はメンテLTS終了 2027-04 まで v0.1 リリース期間を十分カバー。エンドポイント仕様・データモデル・iOS側仕様は変更なし。 |
+| v2.1.3 | 2026-05-16 | STEP1 着手前の依存パッケージ整備とヘルスチェックエンドポイント明文化。§2.4 に4件追加: `@hono/zod-validator@0.4.1`(Zod 検証ミドルウェア)/ `@biomejs/biome@1.9.4`(整形・リント)/ `vitest@2.1.4` + `@cloudflare/vitest-pool-workers@0.5.30`(Workers 環境テスト)。§8.7 を新設し `GET /api/health` を運用ヘルスチェックとして定義(認証不要・副作用なし・`{status:"ok"}` 返却)。設計判断・データモデル・既存エンドポイント・iOS側仕様は変更なし。 |
+| v2.1.4 | 2026-05-16 | §2.4 ピン整合修正: `@cloudflare/workers-types` を `4.20241011.0` → `4.20241106.0`。v2.1.3 で追加した `@cloudflare/vitest-pool-workers@0.5.30` の peer dep 要件 `^4.20241106.0` を満たすための整合修正。約 1ヶ月分の型定義差分のみで、Workers Runtime API そのものに変更はない。設計判断・他の依存パッケージ・エンドポイント仕様・データモデル・iOS側仕様は変更なし。 |
+| v2.1.5 | 2026-05-16 | STEP2 着手前: レート制限実装方式を確定。§4.2 `users` テーブルに `daily_checkin_count`(integer/default 0)と `daily_checkin_reset_at`(timestamp/default unixepoch())の 2 カラムを追加。§8.1 にロジック(rolling 24h window, 11 回目で 429 即返却)を明文化。実装は D1 単独で完結し、Workers KV / Durable Objects バインディングは追加しない。他のエンドポイント仕様・iOS 側仕様・既存カラム・既存マイグレーションは変更なし(マイグレーション v2 を新規追加して列追加する)。 |
+| v2.1.6 | 2026-05-16 | STEP6 着手前: §8.5 DELETE /api/account の論理削除実装方式を確定。旧版の「`last_checkin_at = NULL` で Cron 対象外化」ヒントが §4.2 NOT NULL 制約と矛盾していたため、「`deletion_requests` の未完了行存在チェック」方式に書き換え。同一 UUID の重複 DELETE 要求は冪等(既存の未完了 deletion_request を返却)。物理削除時の cascade 挙動と audit trail 保持(`completed_at` セット)を明文化。スキーマ・マイグレーション・他エンドポイント・iOS 側仕様は変更なし。 |
+| **v2.2.0** | **2026-05-17** | **STEP7 Codex設計レビューゲート対応: §2.2/§2.4 に App Attest(`DCAppAttestService`)/ StoreKit JWS サーバー検証 / `jose@5.9.6` 追加。§4.2 に `app_attest_keys` / `attest_challenges` / `storekit_transactions` 3テーブル新設、`notification_logs` に `contact_id`(M-05 per-contact retry)+ `retry_count` 追加、`idx_users_alert_target` 部分 index(M-02 Cron 絞り込み)を追加。§6 F-11 に削除取消権(48h以内)を追加。§8.1 を認証ヘッダ 4 種(App Attest)+ エラーコード一覧 + checkin atomic UPDATE(M-01)に書き換え。§8.3 から `is_pro` 受付削除(サーバー派生値化)。§8.4 contacts を `batch()` で原子化(M-04)。§8.5 に削除リクエスト中 409 `DELETION_PENDING`(M-03)。§8.6 Cron を SQL 集約 + per-contact retry に書き換え。§8.7-§8.10 新設(`/api/attest/{challenge,register}` / `/api/storekit/verify` / `/api/account/cancel-deletion`)。旧 §8.7 health は §8.11 にリナンバー。§10.3 に JWS / 公開鍵保存メモ追加。§10.7 新設(App Attest 検証フロー + 端末非対応フォールバック)。§13 Sprint 4/5 を C-01/C-02 込みに拡張。iOS 側仕様(GRDB / Keychain / 通知 UI / ピクセルカレンダー)は変更なし。本書** |
 
 ### 15.4 関連メモリ
 

@@ -1,7 +1,7 @@
 # Hibix — メンタル日記 × 安否確認アプリ 設計書
 
 **作成日**: 2026-05-15
-**最終更新**: 2026-05-15 (v0.7 — 設計書反映漏れの修正: Cloudflare復元 / Codexレビューゲート復元 / ピクセルカレンダー解釈明記)
+**最終更新**: 2026-05-17 (v0.8 — Codex設計レビュー反映: 入口認証を App Attest に確定 / StoreKit JWS サーバー検証導入 / Cloudflare 補強)
 **ステータス**: Phase 0 完了 / **Phase 1 開発準備中(PRD v2.0 → v2.1 修正待ち)**
 **プロジェクト名**: **Hibix(ヒビックス)**
 **意味**: 「ヒビ(日々)× ix(pixel / mix / matrix)」
@@ -267,12 +267,15 @@ GitHubコントリビューションカレンダー(草グラフ)と同じ挙動
 | 項目 | ルール |
 |---|---|
 | HTTPS | 全通信HTTPS強制。HSTS preload申請 |
-| CORS | iOSアプリのbundle ID由来のtoken認証のみ許可 |
-| レート制限 | 1ユーザーあたり ping 1日10回まで |
+| 入口認証 | **App Attest**(`DCAppAttestService`)の assertion をミドルウェアで検証。全 mutating API で必須(`/api/health` および attest 初期化エンドポイントを除く)。詳細は PRD §8.1 / §10.7 |
+| 課金検証 | **StoreKit JWS をサーバー側で Apple Root CA G3 検証**。`is_pro` はサーバー派生値で、クライアント申告は受け付けない。詳細は PRD §8.9 |
+| CORS | `Access-Control-Allow-Origin: null`(iOS ネイティブからのアクセスのみ想定。WebView 等の Origin が来たら拒否) |
+| Cloudflare 補強 | Bot Fight Mode 有効化、Rate Limiting Rules で IP あたり 60 req/min ハードキャップ |
+| レート制限 | 1ユーザーあたり checkin 1日10回まで(D1 上で条件付き UPDATE による atomic 更新) |
 | 監査ログ | 緊急連絡先メール送信は全件ログ。30日で自動削除 |
-| 依存パッケージ | `npm audit` を CI で必須化、HIGH以上は即修正 |
+| 依存パッケージ | `pnpm audit` を CI で必須化、HIGH以上は即修正 |
 | シークレットスキャン | Gitleaks を pre-commit hook と CI で実行 |
-| データ削除権 | ユーザーリクエストで48時間以内に全データ削除 |
+| データ削除権 | ユーザーリクエストで48時間以内に全データ削除。48h 経過前は `POST /api/account/cancel-deletion` で取り消し可 |
 | バックアップ | D1の日次自動バックアップ。30日保持 |
 
 ### 5.3 将来コスト青天井防止原則
@@ -764,5 +767,5 @@ PRD v2.1 がこのプロジェクトに追加されたら、CC設計士は実装
 - 2026-05-15 v0.4(商標調査完了・Hibix使用GO判定)
 - 2026-05-15 v0.5(収益スコア記録完了・Tier S確定)
 - 2026-05-15 v0.6(PRD v2.0 反映:MVP 16機能確定 / 技術スタック確定 / 認証=匿名UUID / 価格v0.1は¥2,800のみ)
-- **2026-05-15 v0.7(設計書反映漏れの修正: Cloudflare Workers + D1 復元 / Codex設計レビューゲート復元 / ピクセルカレンダー直近365日ローリングウィンドウ明記 / PRD v2.1 修正引き継ぎリスト新設)**
-- 次回更新: PRD v2.1 完了時 → v0.8
+- 2026-05-15 v0.7(設計書反映漏れの修正: Cloudflare Workers + D1 復元 / Codex設計レビューゲート復元 / ピクセルカレンダー直近365日ローリングウィンドウ明記 / PRD v2.1 修正引き継ぎリスト新設)
+- **2026-05-17 v0.8(Codex設計レビュー反映: §5.2 入口認証を App Attest に確定 / StoreKit JWS サーバー検証導入 / Cloudflare 補強 / 削除リクエスト取り消し権を追記。詳細な実装仕様は PRD v2.2.0 を参照)**

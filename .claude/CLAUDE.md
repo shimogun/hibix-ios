@@ -32,8 +32,8 @@ PRD §13 Sprint をそのまま採用。
 | STEP1 | 基盤(Package.swift/GRDB/Migrations/KeychainStore) | S1.1〜S1.3 | ✅ **承認1** |
 | STEP2 | コア記録機能(F-01〜F-04) | S2.1〜S2.4 | - |
 | STEP3 | オンボーディング+通知(F-05) | S3.1〜S3.2 | - |
-| STEP4 | APIクライアント+checkin連携(Backend STEP7 Codexレビュー通過を待つ) | S4.3 | - |
-| STEP5 | 課金+ゲーティング(F-12〜F-14) + PaywallView + F-04全期間 | S5.1〜S5.4 | ✅ **承認2** |
+| STEP4 | APIクライアント+checkin連携 + App Attestクライアント(PRD v2.2.0 §8/§10.7) | S4.3 + S4.5 | - |
+| STEP5 | 課金+ゲーティング(F-12〜F-14) + PaywallView + F-04全期間 + /api/storekit/verify連携(C-01) | S5.1〜S5.5 | ✅ **承認2** |
 | STEP6 | 設定+有料機能UI(F-06〜F-08) | S6.1〜S6.4 | - |
 | STEP7 | 削除権+アクセシビリティ仕上げ(F-10/F-11) | S8 | - |
 | STEP8 | テスト網羅+TestFlight準備 | S9 | ✅ **承認3** |
