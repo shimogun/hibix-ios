@@ -18,6 +18,12 @@ enum HibixDate {
         return formatter.string(from: date)
     }
 
+    nonisolated static func iso8601Date(from string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
+
     nonisolated private static func formatEntryDate(_ date: Date, calendar: Calendar) -> String {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         let year = components.year ?? 1970

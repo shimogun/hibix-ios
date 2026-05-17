@@ -29,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0018F0B52FB9D4A2004C3E05 /* Hibix.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = Hibix.storekit; path = Configuration/Hibix.storekit; sourceTree = "<group>"; };
 		00B1CA102FB83ECC007F3676 /* Hibix.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hibix.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		00B1CA1D2FB83ED1007F3676 /* HibixTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HibixTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		00B1CA272FB83ED1007F3676 /* HibixUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HibixUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -82,6 +83,7 @@
 		00B1CA072FB83ECC007F3676 = {
 			isa = PBXGroup;
 			children = (
+				0018F0B52FB9D4A2004C3E05 /* Hibix.storekit */,
 				00B1CA122FB83ECC007F3676 /* Hibix */,
 				00B1CA202FB83ED1007F3676 /* HibixTests */,
 				00B1CA2A2FB83ED1007F3676 /* HibixUITests */,

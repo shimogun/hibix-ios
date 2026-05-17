@@ -3,7 +3,9 @@ import SwiftUI
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
     @State private var isMoodPickerSheetPresented: Bool = false
+    @State private var isSettingsPresented: Bool = false
     @Bindable private var entitlement: EntitlementManager
+    private let dependencies: AppDependencies
     private let notificationTapCoordinator: NotificationTapCoordinator
     private let makePaywallViewModel: () -> PaywallViewModel
 
@@ -12,6 +14,7 @@ struct HomeView: View {
             repository: dependencies.moodEntryRepository,
             checkinService: dependencies.checkinService
         ))
+        self.dependencies = dependencies
         self.entitlement = dependencies.entitlementManager
         self.notificationTapCoordinator = dependencies.notificationTapCoordinator
         let manager = dependencies.entitlementManager
@@ -37,6 +40,16 @@ struct HomeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isSettingsPresented = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("設定")
+                }
+            }
             .navigationDestination(item: $bindable.selectedDetailDate) { dateString in
                 EntryDetailView(date: dateString, viewModel: viewModel)
             }
@@ -74,6 +87,11 @@ struct HomeView: View {
                         viewModel.isPaywallPresented = false
                     }
                 )
+            }
+            .sheet(isPresented: $isSettingsPresented) {
+                SettingsView(dependencies: dependencies) {
+                    isSettingsPresented = false
+                }
             }
         }
     }

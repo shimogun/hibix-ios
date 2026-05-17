@@ -12,6 +12,7 @@ final class AppDependencies {
     let anonymousUUID: String
     let moodEntryRepository: MoodEntryRepository
     let settingsRepository: SettingsRepository
+    let emergencyContactsRepository: EmergencyContactsRepository
     let notificationScheduler: NotificationScheduler
     let notificationTapCoordinator: NotificationTapCoordinator
     let apiClient: APIClient
@@ -19,6 +20,7 @@ final class AppDependencies {
     let checkinService: CheckinService
     let entitlementManager: EntitlementManager
     let storeKitVerifyService: StoreKitVerifyService
+    let appLockManager: AppLockManager
 
     /// オンボーディング完了済みか。未ロード時は nil（RootView は読み込み待ち画面を出す）。
     private(set) var onboardingDone: Bool?
@@ -41,6 +43,7 @@ final class AppDependencies {
         let settings = SettingsRepository(writer: database.dbPool)
         try settings.ensureDefaultsSync()
         self.settingsRepository = settings
+        self.emergencyContactsRepository = EmergencyContactsRepository(writer: database.dbPool)
         self.notificationScheduler = NotificationScheduler(settings: settings)
         let coordinator = NotificationTapCoordinator()
         self.notificationTapCoordinator = coordinator
@@ -83,6 +86,8 @@ final class AppDependencies {
             }
         )
 
+        self.appLockManager = AppLockManager(settings: settings)
+
         Self.logger.info("AppDependencies bootstrapped")
     }
 
@@ -95,6 +100,7 @@ final class AppDependencies {
     /// - Entitlement 復元 + Transaction.updates 監視開始
     func warmUp() async {
         UNUserNotificationCenter.current().delegate = notificationDelegateAdapter
+        await appLockManager.warmUp()
         do {
             onboardingDone = try await settingsRepository.bool(forKey: .onboardingDone)
         } catch {
