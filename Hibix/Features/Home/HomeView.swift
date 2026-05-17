@@ -6,7 +6,10 @@ struct HomeView: View {
     private let notificationTapCoordinator: NotificationTapCoordinator
 
     init(dependencies: AppDependencies) {
-        _viewModel = State(initialValue: HomeViewModel(repository: dependencies.moodEntryRepository))
+        _viewModel = State(initialValue: HomeViewModel(
+            repository: dependencies.moodEntryRepository,
+            checkinService: dependencies.checkinService
+        ))
         self.notificationTapCoordinator = dependencies.notificationTapCoordinator
     }
 

@@ -12,13 +12,16 @@ final class HomeViewModel {
     var selectedDetailDate: String?
 
     private let repository: any MoodEntryRepositoryProtocol
+    private let checkinService: CheckinService?
     private let now: @Sendable () -> Date
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Home")
 
     init(repository: any MoodEntryRepositoryProtocol,
+         checkinService: CheckinService? = nil,
          now: @escaping @Sendable () -> Date = { Date() }) {
         self.repository = repository
+        self.checkinService = checkinService
         self.now = now
     }
 
@@ -46,14 +49,18 @@ final class HomeViewModel {
         let date = HibixDate.todayString(now: now())
         let preservedMemo = calendarEntries[date]?.memo
         do {
+            let tapAt = now()
             let entry = try await repository.upsert(date: date,
                                                     level: level,
                                                     memo: preservedMemo,
-                                                    now: now())
+                                                    now: tapAt)
             calendarEntries[date] = entry
             lastErrorMessage = nil
             isMemoSheetPresented = true
             Self.logger.info("Recorded mood level=\(level.rawValue, privacy: .public) date=\(date, privacy: .public)")
+            if let checkinService {
+                Task { await checkinService.reportCheckin(at: tapAt) }
+            }
         } catch {
             lastErrorMessage = error.localizedDescription
             Self.logger.error("Record mood failed: \(error.localizedDescription, privacy: .public)")

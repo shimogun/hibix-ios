@@ -13,6 +13,9 @@ final class AppDependencies {
     let settingsRepository: SettingsRepository
     let notificationScheduler: NotificationScheduler
     let notificationTapCoordinator: NotificationTapCoordinator
+    let apiClient: APIClient
+    let appAttestClient: AppAttestClient
+    let checkinService: CheckinService
 
     /// オンボーディング完了済みか。未ロード時は nil（RootView は読み込み待ち画面を出す）。
     private(set) var onboardingDone: Bool?
@@ -28,8 +31,10 @@ final class AppDependencies {
         self.database = database
         let store = KeychainStore()
         self.keychain = store
-        self.anonymousUUID = try store.loadOrIssueAnonymousUUID()
-        self.moodEntryRepository = MoodEntryRepository(writer: database.dbPool)
+        let uuid = try store.loadOrIssueAnonymousUUID()
+        self.anonymousUUID = uuid
+        let moodRepo = MoodEntryRepository(writer: database.dbPool)
+        self.moodEntryRepository = moodRepo
         let settings = SettingsRepository(writer: database.dbPool)
         try settings.ensureDefaultsSync()
         self.settingsRepository = settings
@@ -37,6 +42,34 @@ final class AppDependencies {
         let coordinator = NotificationTapCoordinator()
         self.notificationTapCoordinator = coordinator
         self.notificationDelegateAdapter = NotificationDelegateAdapter(coordinator: coordinator)
+
+        let apiClient = APIClient(anonymousUUID: uuid)
+        self.apiClient = apiClient
+
+        let attestService = DefaultAppAttestService()
+        let attestStore = AppAttestKeyStore()
+        let attestClient = AppAttestClient(
+            service: attestService,
+            store: attestStore,
+            fetchChallenge: { [weak apiClient] in
+                guard let apiClient else { throw APIError.configuration("APIClient released") }
+                return try await apiClient.request(.attestChallenge)
+            },
+            register: { [weak apiClient] body in
+                guard let apiClient else { throw APIError.configuration("APIClient released") }
+                let _: AttestRegisterResponse = try await apiClient.request(.attestRegister(body))
+            }
+        )
+        self.appAttestClient = attestClient
+        apiClient.attach(attestClient: attestClient)
+
+        self.checkinService = CheckinService(
+            apiClient: apiClient,
+            settings: settings,
+            moodEntries: moodRepo,
+            attest: attestClient
+        )
+
         Self.logger.info("AppDependencies bootstrapped")
     }
 
@@ -44,6 +77,8 @@ final class AppDependencies {
     /// - 通知 delegate を装着
     /// - settings.onboarding_done を読み込み observable state へ反映
     /// - 朝/夜通知の予約状態を整える
+    /// - App Attest 登録(未登録のみ初回)
+    /// - 未送信 checkin の resync
     func warmUp() async {
         UNUserNotificationCenter.current().delegate = notificationDelegateAdapter
         do {
@@ -53,6 +88,14 @@ final class AppDependencies {
             onboardingDone = false
         }
         await notificationScheduler.rescheduleDailyNotifications()
+
+        // App Attest 登録は backend 疎通を伴うため、失敗してもアプリ起動を阻害しない。
+        let registered = await appAttestClient.ensureRegistered()
+        if registered {
+            await checkinService.resyncPendingCheckins()
+        } else {
+            Self.logger.notice("App Attest unavailable; running in read-only mode")
+        }
     }
 
     func markOnboardingDone() {
