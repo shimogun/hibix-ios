@@ -2,9 +2,12 @@ import SwiftUI
 
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
+    @State private var isMoodPickerSheetPresented: Bool = false
+    private let notificationTapCoordinator: NotificationTapCoordinator
 
     init(dependencies: AppDependencies) {
         _viewModel = State(initialValue: HomeViewModel(repository: dependencies.moodEntryRepository))
+        self.notificationTapCoordinator = dependencies.notificationTapCoordinator
     }
 
     var body: some View {
@@ -32,6 +35,15 @@ struct HomeView: View {
             .task {
                 await viewModel.load()
             }
+            .onChange(of: notificationTapCoordinator.lastTapId) { _, newId in
+                guard newId != nil else { return }
+                if viewModel.todayEntry == nil {
+                    isMoodPickerSheetPresented = true
+                }
+            }
+            .sheet(isPresented: $isMoodPickerSheetPresented) {
+                moodPickerSheet
+            }
             .sheet(isPresented: $bindable.isMemoSheetPresented) {
                 MoodMemoView(
                     initialMemo: viewModel.todayEntry?.memo,
@@ -43,6 +55,32 @@ struct HomeView: View {
                         viewModel.dismissMemoSheet()
                     }
                 )
+            }
+        }
+    }
+
+    private var moodPickerSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Text("今日の気分を選んでください")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                MoodPickerView(selected: viewModel.todayEntry?.mood) { level in
+                    Task {
+                        await viewModel.recordMood(level)
+                        isMoodPickerSheetPresented = false
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("閉じる") {
+                        isMoodPickerSheetPresented = false
+                    }
+                }
             }
         }
     }

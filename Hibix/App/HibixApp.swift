@@ -9,6 +9,9 @@ struct HibixApp: App {
         WindowGroup {
             RootView()
                 .environment(dependencies)
+                .task {
+                    await dependencies.warmUp()
+                }
         }
     }
 
