@@ -24,7 +24,7 @@ final class AppAttestClient {
     @ObservationIgnored private let service: any AppAttestServiceWrapping
     @ObservationIgnored private let store: AppAttestKeyStore
     @ObservationIgnored private let fetchChallenge: @Sendable () async throws -> AttestChallengeResponse
-    @ObservationIgnored private let register: @Sendable (AttestRegisterBody) async throws -> Void
+    @ObservationIgnored private let register: @Sendable (AttestRegisterBody, String) async throws -> Void
 
     private(set) var lastError: String?
     private var registrationTask: Task<Bool, Never>?
@@ -34,7 +34,7 @@ final class AppAttestClient {
     init(service: any AppAttestServiceWrapping,
          store: AppAttestKeyStore,
          fetchChallenge: @escaping @Sendable () async throws -> AttestChallengeResponse,
-         register: @escaping @Sendable (AttestRegisterBody) async throws -> Void) {
+         register: @escaping @Sendable (AttestRegisterBody, String) async throws -> Void) {
         self.service = service
         self.store = store
         self.fetchChallenge = fetchChallenge
@@ -77,14 +77,33 @@ final class AppAttestClient {
 
     /// mutating リクエスト用の assertion ヘッダを生成する。
     /// 端末非対応 or 未登録 or サーバー疎通失敗時は throws。
+    /// 削除＆再インストール等で Apple 側が旧鍵を無効化したケースに備え、
+    /// assertion 失敗時は Keychain 鍵を破棄→再登録→assertion 再試行（1回のみ）する。
     func makeAssertionHeaders(for body: Data?) async throws -> AppAttestHeaders {
         guard isSupported else {
             throw APIError.attestUnavailable("device not supported")
         }
-        guard let keyId = store.loadKeyId(), store.isRegistered else {
+        guard store.loadKeyId() != nil, store.isRegistered else {
             throw APIError.attestUnavailable("not registered")
         }
 
+        do {
+            return try await assertionAttempt(for: body)
+        } catch APIError.attestUnavailable(let reason) where reason == "assertion generation failed" {
+            Self.logger.notice("Assertion failed, attempting recovery via re-registration")
+            try? store.reset()
+            let recovered = await performRegistration()
+            guard recovered else {
+                throw APIError.attestUnavailable("recovery registration failed")
+            }
+            return try await assertionAttempt(for: body)
+        }
+    }
+
+    private func assertionAttempt(for body: Data?) async throws -> AppAttestHeaders {
+        guard let keyId = store.loadKeyId() else {
+            throw APIError.attestUnavailable("not registered")
+        }
         let challenge = try await fetchChallenge()
         guard let challengeBytes = Data(base64Encoded: challenge.challenge) else {
             throw APIError.attestUnavailable("invalid challenge encoding")
@@ -135,7 +154,7 @@ final class AppAttestClient {
                 attestation: attestation.base64EncodedString(),
                 client_data_hash: clientDataHash.base64EncodedString()
             )
-            try await register(body)
+            try await register(body, challenge.challenge)
 
             try store.setRegistered(true)
             lastError = nil

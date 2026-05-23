@@ -68,9 +68,9 @@ final class AppDependencies {
                 guard let apiClient else { throw APIError.configuration("APIClient released") }
                 return try await apiClient.request(.attestChallenge)
             },
-            register: { [weak apiClient] body in
+            register: { [weak apiClient] body, challenge in
                 guard let apiClient else { throw APIError.configuration("APIClient released") }
-                let _: AttestRegisterResponse = try await apiClient.request(.attestRegister(body))
+                let _: AttestRegisterResponse = try await apiClient.request(.attestRegister(body, challenge: challenge))
             }
         )
         self.appAttestClient = attestClient
@@ -96,8 +96,8 @@ final class AppDependencies {
 
         self.entitlementManager = EntitlementManager(
             keychain: store,
-            onVerifyTransaction: { @Sendable [weak verifyService] transaction in
-                await verifyService?.verify(transaction)
+            onVerifyTransaction: { @Sendable [weak verifyService] verification in
+                await verifyService?.verify(verification)
             }
         )
 

@@ -68,7 +68,7 @@ final class PaywallViewModel {
             case .success(let verification):
                 switch verification {
                 case .verified(let transaction):
-                    await entitlement.handlePurchase(transaction)
+                    await entitlement.handlePurchase(verification)
                     await transaction.finish()
                     purchaseState = .completed
                 case .unverified:

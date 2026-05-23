@@ -27,17 +27,15 @@ final class StoreKitVerifyService {
         self.deletionPending = deletionPending
     }
 
-    /// `Transaction` を JWS 文字列化してサーバーへ送る。失敗はログに残すのみ。
-    func verify(_ transaction: Transaction) async {
+    /// `VerificationResult` の JWS 表現をサーバーへ送る。失敗はログに残すのみ。
+    /// `Transaction.jsonRepresentation` は JSON Data であって JWS ではないため、
+    /// `VerificationResult.jwsRepresentation` を使う (PRD v2.2.0 §8.9)。
+    func verify(_ verification: VerificationResult<Transaction>) async {
         guard attest.isSupported, attest.isRegistered else {
             Self.logger.notice("Skip storekit verify: attest unavailable")
             return
         }
-        let jws = transaction.jsonRepresentation
-        guard let jwsString = String(data: jws, encoding: .utf8) else {
-            Self.logger.error("Failed to encode transaction JWS as UTF-8")
-            return
-        }
+        let jwsString = verification.jwsRepresentation
         do {
             let response: StoreKitVerifyResponse = try await apiClient.request(
                 .storekitVerify(StoreKitVerifyBody(jws: jwsString))

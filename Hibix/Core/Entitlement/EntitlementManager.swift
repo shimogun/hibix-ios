@@ -16,13 +16,13 @@ final class EntitlementManager: EntitlementProviding {
     private(set) var isPro: Bool
 
     @ObservationIgnored private let keychain: KeychainStore
-    @ObservationIgnored private let onVerifyTransaction: @Sendable (Transaction) async -> Void
+    @ObservationIgnored private let onVerifyTransaction: @Sendable (VerificationResult<Transaction>) async -> Void
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Entitlement")
 
     init(keychain: KeychainStore,
-         onVerifyTransaction: @escaping @Sendable (Transaction) async -> Void = { _ in }) {
+         onVerifyTransaction: @escaping @Sendable (VerificationResult<Transaction>) async -> Void = { _ in }) {
         self.keychain = keychain
         self.isPro = keychain.entitlementPro
         self.onVerifyTransaction = onVerifyTransaction
@@ -39,6 +39,8 @@ final class EntitlementManager: EntitlementProviding {
     }
 
     /// `Transaction.currentEntitlements` を再評価。明示的リフレッシュ用(購入復元など)。
+    /// 見つかった検証済みトランザクションは `onVerifyTransaction` にも渡し、
+    /// サーバー側 `is_pro` をリストア (PRD v2.2.0 §5 / §10.7 / C-01)。
     func refresh() async {
         var detectedPro = false
         for await result in Transaction.currentEntitlements {
@@ -46,15 +48,18 @@ final class EntitlementManager: EntitlementProviding {
                transaction.productID == StoreKitProduct.proLifetimeID,
                transaction.revocationDate == nil {
                 detectedPro = true
+                await onVerifyTransaction(result)
             }
         }
         await applyEntitlement(detectedPro)
     }
 
     /// 購入成功時に呼ぶ。サーバーへの JWS 送信 + Entitlement 反映。
-    func handlePurchase(_ transaction: Transaction) async {
-        guard transaction.productID == StoreKitProduct.proLifetimeID else { return }
-        await onVerifyTransaction(transaction)
+    /// `VerificationResult` を受け取って `jwsRepresentation` をサーバーに送る。
+    func handlePurchase(_ verification: VerificationResult<Transaction>) async {
+        guard case .verified(let transaction) = verification,
+              transaction.productID == StoreKitProduct.proLifetimeID else { return }
+        await onVerifyTransaction(verification)
         await applyEntitlement(true)
     }
 
@@ -71,7 +76,7 @@ final class EntitlementManager: EntitlementProviding {
             for await result in Transaction.updates {
                 guard let self else { return }
                 if case .verified(let transaction) = result {
-                    await self.handlePurchase(transaction)
+                    await self.handlePurchase(result)
                     await transaction.finish()
                 }
             }

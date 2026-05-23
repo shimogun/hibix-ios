@@ -109,14 +109,19 @@ final class APIClient {
         endpoint: APIEndpoint,
         body: Data?
     ) async throws {
-        guard endpoint.requiresAttest else { return }
-        guard let attestClient else {
-            throw APIError.configuration("AppAttestClient is not attached")
+        if endpoint.requiresAttest {
+            guard let attestClient else {
+                throw APIError.configuration("AppAttestClient is not attached")
+            }
+            let headers = try await attestClient.makeAssertionHeaders(for: body)
+            request.setValue(headers.keyId, forHTTPHeaderField: APIHeader.attestKeyId)
+            request.setValue(headers.assertion, forHTTPHeaderField: APIHeader.attestAssertion)
+            request.setValue(headers.challenge, forHTTPHeaderField: APIHeader.attestChallenge)
+            return
         }
-        let headers = try await attestClient.makeAssertionHeaders(for: body)
-        request.setValue(headers.keyId, forHTTPHeaderField: APIHeader.attestKeyId)
-        request.setValue(headers.assertion, forHTTPHeaderField: APIHeader.attestAssertion)
-        request.setValue(headers.challenge, forHTTPHeaderField: APIHeader.attestChallenge)
+        if endpoint.requiresChallengeOnly, let challenge = endpoint.challengeHeaderValue {
+            request.setValue(challenge, forHTTPHeaderField: APIHeader.attestChallenge)
+        }
     }
 
     private static func decodeErrorBody(_ data: Data) -> APIErrorResponse? {

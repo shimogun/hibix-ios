@@ -132,7 +132,7 @@ struct APIClientTests {
             fetchChallenge: { @Sendable in
                 AttestChallengeResponse(challenge: "Y2hhbGxlbmdl", expires_at: Date().addingTimeInterval(300))
             },
-            register: { @Sendable _ in }
+            register: { @Sendable _, _ in }
         )
         client.attach(attestClient: attest)
 

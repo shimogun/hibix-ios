@@ -63,7 +63,7 @@ struct APIEndpointTests {
         #expect(APIEndpoint.contacts(ContactsPutBody(contacts: [])).path == "/api/contacts")
         #expect(APIEndpoint.account.path == "/api/account")
         #expect(APIEndpoint.attestChallenge.path == "/api/attest/challenge")
-        #expect(APIEndpoint.attestRegister(AttestRegisterBody(key_id: "k", attestation: "a", client_data_hash: "h")).path == "/api/attest/register")
+        #expect(APIEndpoint.attestRegister(AttestRegisterBody(key_id: "k", attestation: "a", client_data_hash: "h"), challenge: "c").path == "/api/attest/register")
         #expect(APIEndpoint.storekitVerify(StoreKitVerifyBody(jws: "jws")).path == "/api/storekit/verify")
         #expect(APIEndpoint.cancelDeletion.path == "/api/account/cancel-deletion")
         #expect(APIEndpoint.health.path == "/api/health")
@@ -88,7 +88,7 @@ struct APIEndpointTests {
         #expect(APIEndpoint.cancelDeletion.requiresAttest)
 
         #expect(!APIEndpoint.attestChallenge.requiresAttest)
-        #expect(!APIEndpoint.attestRegister(AttestRegisterBody(key_id: "k", attestation: "a", client_data_hash: "h")).requiresAttest)
+        #expect(!APIEndpoint.attestRegister(AttestRegisterBody(key_id: "k", attestation: "a", client_data_hash: "h"), challenge: "c").requiresAttest)
         #expect(!APIEndpoint.health.requiresAttest)
     }
 }

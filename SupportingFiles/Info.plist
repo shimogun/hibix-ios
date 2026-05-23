@@ -48,6 +48,6 @@
 		<true/>
 	</dict>
 	<key>HIBIX_API_BASE_URL</key>
-	<string>http://127.0.0.1:8787</string>
+	<string>https://domestic-mart-closely-elite.trycloudflare.com</string>
 </dict>
 </plist>

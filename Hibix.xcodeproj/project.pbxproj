@@ -414,6 +414,7 @@
 				DEVELOPMENT_TEAM = N9UZ38LQ27;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SupportingFiles/Info.plist;
+				INFOPLIST_KEY_HIBIX_API_BASE_URL = "https://domestic-mart-closely-elite.trycloudflare.com";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -442,6 +443,7 @@
 				DEVELOPMENT_TEAM = N9UZ38LQ27;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SupportingFiles/Info.plist;
+				INFOPLIST_KEY_HIBIX_API_BASE_URL = "https://domestic-mart-closely-elite.trycloudflare.com";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

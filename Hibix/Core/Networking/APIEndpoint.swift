@@ -10,7 +10,7 @@ enum APIEndpoint {
     case contacts(ContactsPutBody)
     case account
     case attestChallenge
-    case attestRegister(AttestRegisterBody)
+    case attestRegister(AttestRegisterBody, challenge: String)
     case storekitVerify(StoreKitVerifyBody)
     case cancelDeletion
     case health
@@ -59,6 +59,12 @@ enum APIEndpoint {
         return false
     }
 
+    /// `requiresChallengeOnly` のエンドポイントで `X-Hibix-Attest-Challenge` ヘッダに載せる値。
+    var challengeHeaderValue: String? {
+        if case .attestRegister(_, let challenge) = self { return challenge }
+        return nil
+    }
+
     func makeBody() throws -> Data? {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -69,7 +75,7 @@ enum APIEndpoint {
             return try encoder.encode(body)
         case .contacts(let body):
             return try encoder.encode(body)
-        case .attestRegister(let body):
+        case .attestRegister(let body, _):
             return try encoder.encode(body)
         case .storekitVerify(let body):
             return try encoder.encode(body)
