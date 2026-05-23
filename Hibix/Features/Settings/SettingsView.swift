@@ -27,6 +27,7 @@ struct SettingsView: View {
                 watchSection
                 securitySection
                 purchaseSection
+                dangerSection
             }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)
@@ -119,6 +120,25 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
+        }
+    }
+
+    private var dangerSection: some View {
+        Section("危険な操作") {
+            NavigationLink {
+                DataDeletionView(dependencies: dependencies)
+            } label: {
+                HStack {
+                    Text("データを削除")
+                        .foregroundStyle(.red)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityHint("アプリ内とサーバー上の全データを完全に削除します")
         }
     }
 

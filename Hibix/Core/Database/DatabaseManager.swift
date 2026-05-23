@@ -28,6 +28,16 @@ final class DatabaseManager {
         Self.logger.info("Database initialized at \(databaseURL.path, privacy: .public)")
     }
 
+    /// 全コネクションを閉じてファイルロックを解放する。F-11 データ削除時にファイル削除前に呼ぶ。
+    /// 呼び出し後の `dbPool` 利用は不可。
+    func close() async {
+        do {
+            try dbPool.close()
+        } catch {
+            Self.logger.error("DB close failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     static func defaultURL() throws -> URL {
         guard let documents = FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)

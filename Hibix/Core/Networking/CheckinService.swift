@@ -14,17 +14,24 @@ final class CheckinService {
     @ObservationIgnored private let settings: SettingsRepository
     @ObservationIgnored private let moodEntries: MoodEntryRepository
     @ObservationIgnored private let attest: AppAttestClient
+    @ObservationIgnored private weak var deletionPending: DeletionPendingCoordinator?
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Checkin")
 
     init(apiClient: APIClient,
          settings: SettingsRepository,
          moodEntries: MoodEntryRepository,
-         attest: AppAttestClient) {
+         attest: AppAttestClient,
+         deletionPending: DeletionPendingCoordinator? = nil) {
         self.apiClient = apiClient
         self.settings = settings
         self.moodEntries = moodEntries
         self.attest = attest
+        self.deletionPending = deletionPending
+    }
+
+    func attach(deletionPending: DeletionPendingCoordinator) {
+        self.deletionPending = deletionPending
     }
 
     /// 気分タップ完了直後にバックグラウンドで呼ぶ。
@@ -45,7 +52,7 @@ final class CheckinService {
         } catch let error as APIError {
             Self.logger.error("Checkin failed (APIError): \(error.localizedDescription, privacy: .public)")
             if error.isDeletionPending {
-                Self.logger.notice("Server reports DELETION_PENDING; STEP7 で cancel UX を表示する")
+                deletionPending?.report(error)
             }
         } catch {
             Self.logger.error("Checkin failed: \(error.localizedDescription, privacy: .public)")

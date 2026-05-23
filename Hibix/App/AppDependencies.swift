@@ -8,7 +8,9 @@ import os.log
 @Observable
 final class AppDependencies {
     let database: DatabaseManager
+    let databaseURL: URL
     let keychain: KeychainStore
+    let attestKeyStore: AppAttestKeyStore
     let anonymousUUID: String
     let moodEntryRepository: MoodEntryRepository
     let settingsRepository: SettingsRepository
@@ -21,6 +23,8 @@ final class AppDependencies {
     let entitlementManager: EntitlementManager
     let storeKitVerifyService: StoreKitVerifyService
     let appLockManager: AppLockManager
+    let accountDeletionService: AccountDeletionService
+    let deletionPending: DeletionPendingCoordinator
 
     /// オンボーディング完了済みか。未ロード時は nil（RootView は読み込み待ち画面を出す）。
     private(set) var onboardingDone: Bool?
@@ -32,6 +36,7 @@ final class AppDependencies {
 
     init() throws {
         let databaseURL = try DatabaseManager.defaultURL()
+        self.databaseURL = databaseURL
         let database = try DatabaseManager(databaseURL: databaseURL)
         self.database = database
         let store = KeychainStore()
@@ -44,16 +49,18 @@ final class AppDependencies {
         try settings.ensureDefaultsSync()
         self.settingsRepository = settings
         self.emergencyContactsRepository = EmergencyContactsRepository(writer: database.dbPool)
-        self.notificationScheduler = NotificationScheduler(settings: settings)
-        let coordinator = NotificationTapCoordinator()
-        self.notificationTapCoordinator = coordinator
-        self.notificationDelegateAdapter = NotificationDelegateAdapter(coordinator: coordinator)
+        let scheduler = NotificationScheduler(settings: settings)
+        self.notificationScheduler = scheduler
+        let tapCoordinator = NotificationTapCoordinator()
+        self.notificationTapCoordinator = tapCoordinator
+        self.notificationDelegateAdapter = NotificationDelegateAdapter(coordinator: tapCoordinator)
 
         let apiClient = APIClient(anonymousUUID: uuid)
         self.apiClient = apiClient
 
         let attestService = DefaultAppAttestService()
         let attestStore = AppAttestKeyStore()
+        self.attestKeyStore = attestStore
         let attestClient = AppAttestClient(
             service: attestService,
             store: attestStore,
@@ -69,14 +76,22 @@ final class AppDependencies {
         self.appAttestClient = attestClient
         apiClient.attach(attestClient: attestClient)
 
+        let pendingCoordinator = DeletionPendingCoordinator()
+        self.deletionPending = pendingCoordinator
+
         self.checkinService = CheckinService(
             apiClient: apiClient,
             settings: settings,
             moodEntries: moodRepo,
-            attest: attestClient
+            attest: attestClient,
+            deletionPending: pendingCoordinator
         )
 
-        let verifyService = StoreKitVerifyService(apiClient: apiClient, attest: attestClient)
+        let verifyService = StoreKitVerifyService(
+            apiClient: apiClient,
+            attest: attestClient,
+            deletionPending: pendingCoordinator
+        )
         self.storeKitVerifyService = verifyService
 
         self.entitlementManager = EntitlementManager(
@@ -87,6 +102,17 @@ final class AppDependencies {
         )
 
         self.appLockManager = AppLockManager(settings: settings)
+
+        let deletionService = AccountDeletionService(
+            apiClient: apiClient,
+            database: database,
+            databaseURL: databaseURL,
+            keychain: store,
+            attestKeyStore: attestStore,
+            notificationScheduler: scheduler
+        )
+        self.accountDeletionService = deletionService
+        pendingCoordinator.attach(deletionService: deletionService)
 
         Self.logger.info("AppDependencies bootstrapped")
     }

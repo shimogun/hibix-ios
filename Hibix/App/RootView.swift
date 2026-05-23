@@ -24,9 +24,21 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: dependencies.appLockManager.isLocked)
+        .sheet(isPresented: deletionPendingBinding) {
+            DeletionPendingModal(coordinator: dependencies.deletionPending)
+        }
         .onChange(of: scenePhase) { _, newPhase in
             handleScenePhase(newPhase)
         }
+    }
+
+    private var deletionPendingBinding: Binding<Bool> {
+        Binding(
+            get: { dependencies.deletionPending.pending != nil },
+            set: { newValue in
+                if !newValue { dependencies.deletionPending.dismiss() }
+            }
+        )
     }
 
     private var splash: some View {

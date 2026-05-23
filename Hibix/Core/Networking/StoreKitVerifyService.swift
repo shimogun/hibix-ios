@@ -11,12 +11,20 @@ import os.log
 final class StoreKitVerifyService {
     @ObservationIgnored private let apiClient: APIClient
     @ObservationIgnored private let attest: AppAttestClient
+    @ObservationIgnored private weak var deletionPending: DeletionPendingCoordinator?
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "StoreKitVerify")
 
-    init(apiClient: APIClient, attest: AppAttestClient) {
+    init(apiClient: APIClient,
+         attest: AppAttestClient,
+         deletionPending: DeletionPendingCoordinator? = nil) {
         self.apiClient = apiClient
         self.attest = attest
+        self.deletionPending = deletionPending
+    }
+
+    func attach(deletionPending: DeletionPendingCoordinator) {
+        self.deletionPending = deletionPending
     }
 
     /// `Transaction` を JWS 文字列化してサーバーへ送る。失敗はログに残すのみ。
@@ -37,6 +45,9 @@ final class StoreKitVerifyService {
             Self.logger.info("Server confirmed is_pro=\(response.is_pro, privacy: .public) for product=\(response.product_id, privacy: .public)")
         } catch let error as APIError {
             Self.logger.error("storekit/verify failed (APIError): \(error.localizedDescription, privacy: .public)")
+            if error.isDeletionPending {
+                deletionPending?.report(error)
+            }
         } catch {
             Self.logger.error("storekit/verify failed: \(error.localizedDescription, privacy: .public)")
         }
