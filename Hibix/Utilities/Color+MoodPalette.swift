@@ -6,8 +6,8 @@ extension Color {
         case .down:    return Color(moodHex: 0x4A5568)
         case .calm:    return Color(moodHex: 0x38B2AC)
         case .neutral: return Color(moodHex: 0xECC94B)
-        case .good:    return Color(moodHex: 0xED8936)
-        case .best:    return Color(moodHex: 0xF687B3)
+        case .good:    return Color(moodHex: 0xF687B3)
+        case .best:    return Color(moodHex: 0xED8936)
         }
     }
 

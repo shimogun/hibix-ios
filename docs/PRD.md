@@ -664,8 +664,8 @@ actor EntitlementManager {
 1: #4A5568  落ち込み（旧 2:沈み もここにマージ）
 3: #38B2AC  平静
 4: #ECC94B  普通
-5: #ED8936  良い（旧 6:高揚 もここにマージ）
-7: #F687B3  最高
+5: #F687B3  良い（旧 6:高揚 もここにマージ）
+7: #ED8936  最高
 ```
 旧 rawValue 2/6 のデータも DB には残り、表示時に `MoodLevel.fromStoredValue` で 1/5 と同じ色に解決される。
 
