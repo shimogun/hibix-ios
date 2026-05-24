@@ -13,6 +13,11 @@ final class HomeViewModel {
     var isPaywallPresented: Bool = false
     var selectedDetailDate: String?
 
+    /// F3 アニメ用: 最後に保存された気分。non-nil の間 flying replica overlay が表示される。
+    var lastSavedMood: MoodLevel?
+    /// 保存完了トーストの文言。non-nil の間トーストが表示される。
+    var toastMessage: String?
+
     private let repository: any MoodEntryRepositoryProtocol
     private let checkinService: CheckinService?
     private let now: @Sendable () -> Date
@@ -63,6 +68,7 @@ final class HomeViewModel {
             calendarEntries[date] = entry
             updateEarliestEntryDateOnInsert(entry: entry)
             lastErrorMessage = nil
+            triggerSaveFeedback(level: level)
             isMemoSheetPresented = true
             Self.logger.info("Recorded mood level=\(level.rawValue, privacy: .public) date=\(date, privacy: .public)")
             if let checkinService {
@@ -90,6 +96,7 @@ final class HomeViewModel {
             calendarEntries[date] = entry
             updateEarliestEntryDateOnInsert(entry: entry)
             lastErrorMessage = nil
+            triggerSaveFeedback(level: level)
             Self.logger.info("Recorded mood (no memo) level=\(level.rawValue, privacy: .public) date=\(date, privacy: .public)")
             if let checkinService {
                 Task { await checkinService.reportCheckin(at: tapAt) }
@@ -145,6 +152,18 @@ final class HomeViewModel {
     }
 
     // MARK: - Private helpers
+
+    /// 保存後の視覚フィードバック (F3): flying replica + toast を一定時間後にクリアする。
+    private func triggerSaveFeedback(level: MoodLevel) {
+        lastSavedMood = level
+        toastMessage = "気分を記録しました"
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            self?.lastSavedMood = nil
+            try? await Task.sleep(for: .milliseconds(400))
+            self?.toastMessage = nil
+        }
+    }
 
     private func updateEarliestEntryDateOnInsert(entry: MoodEntry) {
         guard let entryDate = Self.parseEntryDate(entry.entryDate) else { return }
