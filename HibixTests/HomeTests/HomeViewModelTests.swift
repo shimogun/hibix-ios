@@ -58,13 +58,13 @@ struct HomeViewModelTests {
         let fixed = try makeDate(year: 2026, month: 5, day: 17)
         let (viewModel, repository) = try makeViewModel(fixedDate: fixed)
         _ = try await repository.upsert(date: "2026-05-17",
-                                        level: .good,
+                                        level: .calm,
                                         memo: "事前メモ",
                                         now: fixed)
         await viewModel.load(isPro: false)
-        await viewModel.recordMood(.uplift)
+        await viewModel.recordMood(.good)
         #expect(viewModel.todayEntry?.memo == "事前メモ")
-        #expect(viewModel.todayEntry?.moodLevel == MoodLevel.uplift.rawValue)
+        #expect(viewModel.todayEntry?.moodLevel == MoodLevel.good.rawValue)
     }
 
     @Test

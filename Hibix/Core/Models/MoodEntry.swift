@@ -26,5 +26,5 @@ nonisolated struct MoodEntry: Codable, FetchableRecord, MutablePersistableRecord
 }
 
 extension MoodEntry {
-    var mood: MoodLevel? { MoodLevel(rawValue: moodLevel) }
+    var mood: MoodLevel? { MoodLevel.fromStoredValue(moodLevel) }
 }
