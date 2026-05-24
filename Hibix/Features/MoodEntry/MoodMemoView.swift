@@ -36,9 +36,14 @@ struct MoodMemoView: View {
     private var moodBadge: some View {
         if let mood {
             HStack(spacing: 12) {
-                Circle()
-                    .fill(Color.moodColor(for: mood))
-                    .frame(width: 32, height: 32)
+                ZStack {
+                    Circle()
+                        .fill(Color.moodColor(for: mood))
+                    Image(systemName: mood.iconName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 32, height: 32)
                 Text(mood.displayName)
                     .font(.headline)
                 Spacer()
