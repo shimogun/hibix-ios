@@ -126,4 +126,35 @@ struct PixelCalendarGeometryTests {
                                          isPro: true)
         #expect(geom.columnCount >= PixelCalendarGeometry.minimumColumnCount)
     }
+
+    /// Regression: Pro ユーザーが初回記録時に earliestVisibleDay が今日に
+    /// 縮退して他セルが Color.clear で消える問題の検証。
+    @Test
+    func proUser_withOnlyTodayEntry_stillShows365DayWindow() throws {
+        let today = try date(year: 2026, month: 5, day: 17)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: today,
+                                         isPro: true)
+        #expect(geom.columnCount == PixelCalendarGeometry.defaultColumnCount)
+        // 1年前のセルが可視範囲に含まれる(消えない)
+        let oneYearAgo = try date(year: 2025, month: 5, day: 18)
+        #expect(geom.isInVisibleWindow(oneYearAgo))
+        // 直近100日前のセルも可視
+        let hundredDaysAgo = sundayStartCalendar.date(byAdding: .day, value: -100, to: today)!
+        #expect(geom.isInVisibleWindow(hundredDaysAgo))
+    }
+
+    @Test
+    func proUser_withRecentEntry_windowReachesAt365Days() throws {
+        let today = try date(year: 2026, month: 5, day: 17)
+        let yesterday = try date(year: 2026, month: 5, day: 16)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: yesterday,
+                                         isPro: true)
+        // earliest が yesterday でも、Pro なら 365日 までは可視のはず
+        let oneYearAgo = try date(year: 2025, month: 5, day: 18)
+        #expect(geom.isInVisibleWindow(oneYearAgo))
+    }
 }

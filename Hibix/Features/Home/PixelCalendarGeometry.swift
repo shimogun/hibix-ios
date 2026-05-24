@@ -22,15 +22,17 @@ struct PixelCalendarGeometry: Sendable {
         self.startOfTodayDay = startOfTodayDay
 
         if isPro {
-            // 有料: 最古エントリ(またはデフォルト365日)から今日までを含むよう列数を計算
+            // 有料: 「最古エントリ」と「365日前」のどちらか古い方を起点。
+            // 初回記録(=earliestEntryDate が今日)でも365日分のグリッドが見えるようにする。
+            let defaultEarliest = calendar.date(byAdding: .day,
+                                                value: -(Self.defaultWindowDays - 1),
+                                                to: startOfTodayDay) ?? startOfTodayDay
             let earliestCandidate = earliestEntryDate.map { calendar.startOfDay(for: $0) }
             let earliest: Date
             if let earliestCandidate, earliestCandidate <= startOfTodayDay {
-                earliest = earliestCandidate
+                earliest = min(earliestCandidate, defaultEarliest)
             } else {
-                earliest = calendar.date(byAdding: .day,
-                                         value: -(Self.defaultWindowDays - 1),
-                                         to: startOfTodayDay) ?? startOfTodayDay
+                earliest = defaultEarliest
             }
             self.earliestVisibleDay = earliest
             let days = (calendar.dateComponents([.day], from: earliest, to: startOfTodayDay).day ?? 0) + 1
