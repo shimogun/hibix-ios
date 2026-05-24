@@ -30,6 +30,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, newPhase in
             handleScenePhase(newPhase)
         }
+        .preferredColorScheme(dependencies.appearanceManager.preferredColorScheme)
     }
 
     private var deletionPendingBinding: Binding<Bool> {

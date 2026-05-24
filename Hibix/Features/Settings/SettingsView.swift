@@ -24,6 +24,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 accountSection
+                appearanceSection
                 watchSection
                 securitySection
                 purchaseSection
@@ -46,6 +47,26 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var appearanceSection: some View {
+        Section("外観") {
+            Picker("外観モード", selection: appearanceBinding) {
+                ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+    }
+
+    private var appearanceBinding: Binding<AppearanceMode> {
+        Binding(
+            get: { dependencies.appearanceManager.mode },
+            set: { newMode in
+                Task { await dependencies.appearanceManager.update(newMode) }
+            }
+        )
+    }
 
     private var accountSection: some View {
         Section("アカウント") {

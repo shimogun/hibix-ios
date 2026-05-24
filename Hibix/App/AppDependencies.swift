@@ -25,6 +25,7 @@ final class AppDependencies {
     let appLockManager: AppLockManager
     let accountDeletionService: AccountDeletionService
     let deletionPending: DeletionPendingCoordinator
+    let appearanceManager: AppearanceManager
 
     /// オンボーディング完了済みか。未ロード時は nil（RootView は読み込み待ち画面を出す）。
     private(set) var onboardingDone: Bool?
@@ -114,6 +115,8 @@ final class AppDependencies {
         self.accountDeletionService = deletionService
         pendingCoordinator.attach(deletionService: deletionService)
 
+        self.appearanceManager = AppearanceManager(settings: settings)
+
         Self.logger.info("AppDependencies bootstrapped")
     }
 
@@ -127,6 +130,7 @@ final class AppDependencies {
     func warmUp() async {
         UNUserNotificationCenter.current().delegate = notificationDelegateAdapter
         await appLockManager.warmUp()
+        await appearanceManager.load()
         do {
             onboardingDone = try await settingsRepository.bool(forKey: .onboardingDone)
         } catch {
