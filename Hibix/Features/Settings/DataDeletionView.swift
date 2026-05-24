@@ -39,25 +39,68 @@ struct DataDeletionView: View {
         }
         .navigationTitle("データを削除")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
-            "本当に削除しますか？",
-            isPresented: confirmingBinding,
-            titleVisibility: .visible
-        ) {
-            Button("削除する", role: .destructive) {
-                Task { await runDeletion() }
+        .overlay {
+            if viewModel.state == .confirming {
+                confirmationOverlay
+                    .transition(.opacity)
             }
-            Button("キャンセル", role: .cancel) {
-                viewModel.dismissConfirmation()
-            }
-        } message: {
-            Text("この操作は取り消せません。アプリ内・サーバー上の全データが消去されます。")
         }
         .overlay {
             if viewModel.isBusy {
                 deletionProgress
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.state == .confirming)
+    }
+
+    private var confirmationOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture { viewModel.dismissConfirmation() }
+                .accessibilityHidden(true)
+
+            VStack(spacing: 16) {
+                Text("本当に削除しますか？")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+
+                Text("この操作は取り消せません。アプリ内・サーバー上の全データが消去されます。")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.dismissConfirmation()
+                    } label: {
+                        Text("キャンセル")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button(role: .destructive) {
+                        Task { await runDeletion() }
+                    } label: {
+                        Text("削除する")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                }
+                .padding(.top, 4)
+            }
+            .padding(24)
+            .background(Color(uiColor: .systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+            .padding(.horizontal, 32)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityLabel("削除確認ダイアログ")
     }
 
     private var header: some View {
@@ -134,15 +177,6 @@ struct DataDeletionView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("データを削除しています")
-    }
-
-    private var confirmingBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.state == .confirming },
-            set: { newValue in
-                if !newValue { viewModel.dismissConfirmation() }
-            }
-        )
     }
 
     private func runDeletion() async {

@@ -126,4 +126,17 @@ struct PixelCalendarGeometryTests {
                                          isPro: true)
         #expect(geom.columnCount >= PixelCalendarGeometry.minimumColumnCount)
     }
+
+    @Test
+    func proUser_withTodayOnlyEntry_keepsAtLeast365DayWindow() throws {
+        // 回帰テスト: Pro かつ最古エントリが今日のとき、過去364日が visible window から消えないこと。
+        let today = try date(year: 2026, month: 5, day: 17)
+        let geom = PixelCalendarGeometry(today: today,
+                                         calendar: sundayStartCalendar,
+                                         earliestEntryDate: today,
+                                         isPro: true)
+        let day364Ago = try date(year: 2025, month: 5, day: 18)
+        #expect(geom.isInVisibleWindow(today))
+        #expect(geom.isInVisibleWindow(day364Ago))
+    }
 }

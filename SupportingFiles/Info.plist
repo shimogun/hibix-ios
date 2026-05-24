@@ -42,11 +42,8 @@
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Hibix のアプリロックで本人確認のために Face ID を使用します。</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>HIBIX_API_BASE_URL</key>
 	<string>https://domestic-mart-closely-elite.trycloudflare.com</string>
 </dict>
