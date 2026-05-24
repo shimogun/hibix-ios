@@ -102,12 +102,21 @@ struct HomeView: View {
                 Text("今日の気分を選んでください")
                     .font(.title3)
                     .fontWeight(.semibold)
-                MoodPickerView(selected: viewModel.todayEntry?.mood) { level in
-                    Task {
-                        await viewModel.recordMood(level)
-                        isMoodPickerSheetPresented = false
+                MoodPickerView(
+                    selected: viewModel.todayEntry?.mood,
+                    onSelect: { level in
+                        Task {
+                            await viewModel.recordMood(level)
+                            isMoodPickerSheetPresented = false
+                        }
+                    },
+                    onLongPress: { level in
+                        Task {
+                            await viewModel.recordMoodWithoutMemo(level)
+                            isMoodPickerSheetPresented = false
+                        }
                     }
-                }
+                )
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -154,10 +163,18 @@ struct HomeView: View {
     }
 
     private var picker: some View {
-        MoodPickerView(selected: viewModel.todayEntry?.mood) { level in
-            Task {
-                await viewModel.recordMood(level)
+        MoodPickerView(
+            selected: viewModel.todayEntry?.mood,
+            onSelect: { level in
+                Task {
+                    await viewModel.recordMood(level)
+                }
+            },
+            onLongPress: { level in
+                Task {
+                    await viewModel.recordMoodWithoutMemo(level)
+                }
             }
-        }
+        )
     }
 }

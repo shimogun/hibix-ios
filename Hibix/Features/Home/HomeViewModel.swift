@@ -74,6 +74,32 @@ final class HomeViewModel {
         }
     }
 
+    /// 長押し起動: memo なしで気分のみ即保存する (F1)。
+    /// `recordMood` と異なり MemoSheet を提示しない。
+    func recordMoodWithoutMemo(_ level: MoodLevel) async {
+        guard !isSaving else { return }
+        isSaving = true
+        defer { isSaving = false }
+        let date = HibixDate.todayString(now: now())
+        do {
+            let tapAt = now()
+            let entry = try await repository.upsert(date: date,
+                                                    level: level,
+                                                    memo: nil,
+                                                    now: tapAt)
+            calendarEntries[date] = entry
+            updateEarliestEntryDateOnInsert(entry: entry)
+            lastErrorMessage = nil
+            Self.logger.info("Recorded mood (no memo) level=\(level.rawValue, privacy: .public) date=\(date, privacy: .public)")
+            if let checkinService {
+                Task { await checkinService.reportCheckin(at: tapAt) }
+            }
+        } catch {
+            lastErrorMessage = error.localizedDescription
+            Self.logger.error("Record mood without memo failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     func saveMemo(_ rawText: String) async {
         let date = HibixDate.todayString(now: now())
         do {

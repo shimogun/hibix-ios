@@ -156,6 +156,29 @@ struct HomeViewModelTests {
     }
 
     @Test
+    func recordMoodWithoutMemo_savesEntryWithNilMemo() async throws {
+        let fixed = try makeDate(year: 2026, month: 5, day: 17)
+        let (viewModel, _) = try makeViewModel(fixedDate: fixed)
+        await viewModel.load(isPro: false)
+
+        await viewModel.recordMoodWithoutMemo(.good)
+
+        let entry = viewModel.calendarEntries["2026-05-17"]
+        #expect(entry?.moodLevel == MoodLevel.good.rawValue)
+        #expect(entry?.memo == nil)
+    }
+
+    @Test
+    func recordMoodWithoutMemo_doesNotPresentMemoSheet() async throws {
+        let fixed = try makeDate(year: 2026, month: 5, day: 17)
+        let (viewModel, _) = try makeViewModel(fixedDate: fixed)
+
+        await viewModel.recordMoodWithoutMemo(.calm)
+
+        #expect(viewModel.isMemoSheetPresented == false)
+    }
+
+    @Test
     func load_afterPriorEntryReturnsIt() async throws {
         let fixed = try makeDate(year: 2026, month: 5, day: 17)
         let (viewModel, repository) = try makeViewModel(fixedDate: fixed)

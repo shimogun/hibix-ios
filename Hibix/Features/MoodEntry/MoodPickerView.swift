@@ -40,31 +40,48 @@ private struct MoodPickerButton: View {
     let onTap: () -> Void
     let onLongPress: () -> Void
 
+    @State private var isPressed: Bool = false
+
     private static let selectionStrokeWidth: CGFloat = 3
     private static let labelHeight: CGFloat = 16
 
     var body: some View {
         VStack(spacing: 4) {
-            Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                onTap()
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.moodColor(for: level))
-                    Image(systemName: level.iconName)
-                        .font(.system(size: diameter * 0.4, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Circle()
-                        .strokeBorder(Color.primary, lineWidth: isSelected ? Self.selectionStrokeWidth : 0)
-                }
-                .frame(width: diameter, height: diameter)
-                .scaleEffect(isSelected ? 1.08 : 1.0)
-                .animation(.easeOut(duration: 0.1), value: isSelected)
+            ZStack {
+                Circle()
+                    .fill(Color.moodColor(for: level))
+                Image(systemName: level.iconName)
+                    .font(.system(size: diameter * 0.4, weight: .semibold))
+                    .foregroundStyle(.white)
+                Circle()
+                    .strokeBorder(Color.primary, lineWidth: isSelected ? Self.selectionStrokeWidth : 0)
             }
-            .buttonStyle(.plain)
+            .frame(width: diameter, height: diameter)
+            .scaleEffect(isPressed ? 1.2 : (isSelected ? 1.08 : 1.0))
+            .animation(.easeOut(duration: 0.15), value: isPressed)
+            .animation(.easeOut(duration: 0.1), value: isSelected)
+            .contentShape(Circle())
+            .onLongPressGesture(minimumDuration: 0.5,
+                                maximumDistance: 20,
+                                perform: {
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                    onLongPress()
+                                },
+                                onPressingChanged: { pressing in
+                                    isPressed = pressing
+                                    if pressing {
+                                        UISelectionFeedbackGenerator().selectionChanged()
+                                    }
+                                })
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onTap()
+                }
+            )
+            .accessibilityElement()
             .accessibilityLabel(level.accessibilityLabel)
-            .accessibilityHint("タップして今日の気分を記録、長押しで即記録")
+            .accessibilityHint("タップして気分を記録、長押しでメモなし即記録")
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
 
             Text(isSelected ? level.displayName : "")
