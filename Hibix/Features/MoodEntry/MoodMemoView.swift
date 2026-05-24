@@ -19,6 +19,11 @@ struct MoodMemoView: View {
             VStack(spacing: 16) {
                 moodBadge
                 editor
+                if let mood {
+                    MoodEmojiPaletteView(level: mood) { emoji in
+                        text.append(emoji)
+                    }
+                }
                 counter
             }
             .padding(16)
