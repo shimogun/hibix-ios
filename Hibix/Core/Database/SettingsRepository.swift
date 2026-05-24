@@ -17,6 +17,7 @@ enum SettingsKey: String, CaseIterable, Sendable {
     case appLockEnabled = "app_lock_enabled"
     case onboardingDone = "onboarding_done"
     case lastSyncedAt = "last_synced_at"
+    case appearance = "appearance"
 
     nonisolated var defaultValue: String? {
         switch self {
@@ -27,6 +28,22 @@ enum SettingsKey: String, CaseIterable, Sendable {
         case .appLockEnabled: return "false"
         case .onboardingDone: return "false"
         case .lastSyncedAt: return nil
+        case .appearance: return AppearanceMode.system.rawValue
+        }
+    }
+}
+
+/// 外観モード設定 (システム / ライト / ダーク)。`SettingsKey.appearance` に rawValue を保存。
+enum AppearanceMode: String, CaseIterable, Sendable {
+    case system
+    case light
+    case dark
+
+    var displayName: String {
+        switch self {
+        case .system: return "システムに合わせる"
+        case .light:  return "ライト"
+        case .dark:   return "ダーク"
         }
     }
 }

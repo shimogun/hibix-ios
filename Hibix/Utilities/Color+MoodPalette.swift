@@ -4,12 +4,10 @@ extension Color {
     static func moodColor(for level: MoodLevel) -> Color {
         switch level {
         case .down:    return Color(moodHex: 0x4A5568)
-        case .sink:    return Color(moodHex: 0x4299E1)
         case .calm:    return Color(moodHex: 0x38B2AC)
         case .neutral: return Color(moodHex: 0xECC94B)
-        case .good:    return Color(moodHex: 0xED8936)
-        case .uplift:  return Color(moodHex: 0x9F7AEA)
-        case .best:    return Color(moodHex: 0xF687B3)
+        case .good:    return Color(moodHex: 0xF687B3)
+        case .best:    return Color(moodHex: 0xED8936)
         }
     }
 

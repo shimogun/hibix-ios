@@ -58,13 +58,13 @@ struct HomeViewModelTests {
         let fixed = try makeDate(year: 2026, month: 5, day: 17)
         let (viewModel, repository) = try makeViewModel(fixedDate: fixed)
         _ = try await repository.upsert(date: "2026-05-17",
-                                        level: .good,
+                                        level: .calm,
                                         memo: "事前メモ",
                                         now: fixed)
         await viewModel.load(isPro: false)
-        await viewModel.recordMood(.uplift)
+        await viewModel.recordMood(.good)
         #expect(viewModel.todayEntry?.memo == "事前メモ")
-        #expect(viewModel.todayEntry?.moodLevel == MoodLevel.uplift.rawValue)
+        #expect(viewModel.todayEntry?.moodLevel == MoodLevel.good.rawValue)
     }
 
     @Test
@@ -152,6 +152,29 @@ struct HomeViewModelTests {
         let (viewModel, _) = try makeViewModel(fixedDate: fixed)
         await viewModel.recordMood(.good)
         viewModel.dismissMemoSheet()
+        #expect(viewModel.isMemoSheetPresented == false)
+    }
+
+    @Test
+    func recordMoodWithoutMemo_savesEntryWithNilMemo() async throws {
+        let fixed = try makeDate(year: 2026, month: 5, day: 17)
+        let (viewModel, _) = try makeViewModel(fixedDate: fixed)
+        await viewModel.load(isPro: false)
+
+        await viewModel.recordMoodWithoutMemo(.good)
+
+        let entry = viewModel.calendarEntries["2026-05-17"]
+        #expect(entry?.moodLevel == MoodLevel.good.rawValue)
+        #expect(entry?.memo == nil)
+    }
+
+    @Test
+    func recordMoodWithoutMemo_doesNotPresentMemoSheet() async throws {
+        let fixed = try makeDate(year: 2026, month: 5, day: 17)
+        let (viewModel, _) = try makeViewModel(fixedDate: fixed)
+
+        await viewModel.recordMoodWithoutMemo(.calm)
+
         #expect(viewModel.isMemoSheetPresented == false)
     }
 

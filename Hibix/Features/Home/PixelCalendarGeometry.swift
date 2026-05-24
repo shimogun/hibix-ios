@@ -28,8 +28,8 @@ struct PixelCalendarGeometry: Sendable {
                                                 value: -(Self.defaultWindowDays - 1),
                                                 to: startOfTodayDay) ?? startOfTodayDay
             let earliest: Date
-            if let earliestCandidate, earliestCandidate < defaultEarliest {
-                earliest = earliestCandidate
+            if let earliestCandidate, earliestCandidate <= startOfTodayDay {
+                earliest = min(earliestCandidate, defaultEarliest)
             } else {
                 earliest = defaultEarliest
             }

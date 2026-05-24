@@ -93,7 +93,46 @@ struct HomeView: View {
                     isSettingsPresented = false
                 }
             }
+            .overlay(alignment: .center) {
+                ZStack {
+                    if let mood = viewModel.lastSavedMood {
+                        flyingReplica(for: mood)
+                            .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            .allowsHitTesting(false)
+                    }
+                }
+                .animation(.spring(duration: 0.6), value: viewModel.lastSavedMood)
+            }
+            .overlay(alignment: .bottom) {
+                ZStack {
+                    if let message = viewModel.toastMessage {
+                        Text(message)
+                            .font(.callout)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(.regularMaterial, in: Capsule())
+                            .padding(.bottom, 80)
+                            .transition(.opacity)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(message)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: viewModel.toastMessage)
+            }
         }
+    }
+
+    private func flyingReplica(for mood: MoodLevel) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.moodColor(for: mood))
+                .frame(width: 96, height: 96)
+            Image(systemName: mood.iconName)
+                .font(.system(size: 40, weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .shadow(color: .black.opacity(0.2), radius: 12)
     }
 
     private var moodPickerSheet: some View {
@@ -102,12 +141,21 @@ struct HomeView: View {
                 Text("今日の気分を選んでください")
                     .font(.title3)
                     .fontWeight(.semibold)
-                MoodPickerView(selected: viewModel.todayEntry?.mood) { level in
-                    Task {
-                        await viewModel.recordMood(level)
-                        isMoodPickerSheetPresented = false
+                MoodPickerView(
+                    selected: viewModel.todayEntry?.mood,
+                    onSelect: { level in
+                        Task {
+                            await viewModel.recordMood(level)
+                            isMoodPickerSheetPresented = false
+                        }
+                    },
+                    onLongPress: { level in
+                        Task {
+                            await viewModel.recordMoodWithoutMemo(level)
+                            isMoodPickerSheetPresented = false
+                        }
                     }
-                }
+                )
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -154,10 +202,18 @@ struct HomeView: View {
     }
 
     private var picker: some View {
-        MoodPickerView(selected: viewModel.todayEntry?.mood) { level in
-            Task {
-                await viewModel.recordMood(level)
+        MoodPickerView(
+            selected: viewModel.todayEntry?.mood,
+            onSelect: { level in
+                Task {
+                    await viewModel.recordMood(level)
+                }
+            },
+            onLongPress: { level in
+                Task {
+                    await viewModel.recordMoodWithoutMemo(level)
+                }
             }
-        }
+        )
     }
 }
