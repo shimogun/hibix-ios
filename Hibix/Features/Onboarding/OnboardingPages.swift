@@ -117,24 +117,23 @@ struct OnboardingPermissionPage: View {
 // MARK: - Illustrations
 
 private struct PixelTilesIllustration: View {
-    private let palette: [Color] = [
-        Color(red: 74/255, green: 85/255, blue: 104/255),
-        Color(red: 66/255, green: 153/255, blue: 225/255),
-        Color(red: 56/255, green: 178/255, blue: 172/255),
-        Color(red: 236/255, green: 201/255, blue: 75/255),
-        Color(red: 237/255, green: 137/255, blue: 54/255),
-        Color(red: 159/255, green: 122/255, blue: 234/255),
-        Color(red: 246/255, green: 135/255, blue: 179/255)
-    ]
+    private static let rows: Int = 3
+    private static let cols: Int = 5
+
+    private var palette: [Color] {
+        MoodLevel.allCases.map { Color.moodColor(for: $0) }
+    }
 
     var body: some View {
         VStack(spacing: 6) {
-            ForEach(0..<3, id: \.self) { row in
+            ForEach(0..<Self.rows, id: \.self) { row in
                 HStack(spacing: 6) {
-                    ForEach(0..<7, id: \.self) { col in
+                    ForEach(0..<Self.cols, id: \.self) { col in
+                        // 行ごとに色順をシフトして対角グラデーション風に見せる。
+                        let index = (col + row * 2) % palette.count
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(palette[(row * 7 + col) % palette.count].opacity(0.85))
-                            .frame(width: 28, height: 28)
+                            .fill(palette[index].opacity(0.85))
+                            .frame(width: 32, height: 32)
                     }
                 }
             }
