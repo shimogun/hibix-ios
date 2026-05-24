@@ -94,28 +94,32 @@ struct HomeView: View {
                 }
             }
             .overlay(alignment: .center) {
-                if let mood = viewModel.lastSavedMood {
-                    flyingReplica(for: mood)
-                        .transition(.scale(scale: 0.5).combined(with: .opacity))
-                        .allowsHitTesting(false)
+                ZStack {
+                    if let mood = viewModel.lastSavedMood {
+                        flyingReplica(for: mood)
+                            .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            .allowsHitTesting(false)
+                    }
                 }
+                .animation(.spring(duration: 0.6), value: viewModel.lastSavedMood)
             }
             .overlay(alignment: .bottom) {
-                if let message = viewModel.toastMessage {
-                    Text(message)
-                        .font(.callout)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.regularMaterial, in: Capsule())
-                        .padding(.bottom, 80)
-                        .transition(.opacity)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(message)
-                        .allowsHitTesting(false)
+                ZStack {
+                    if let message = viewModel.toastMessage {
+                        Text(message)
+                            .font(.callout)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(.regularMaterial, in: Capsule())
+                            .padding(.bottom, 80)
+                            .transition(.opacity)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(message)
+                            .allowsHitTesting(false)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.2), value: viewModel.toastMessage)
             }
-            .animation(.spring(duration: 0.6), value: viewModel.lastSavedMood)
-            .animation(.easeInOut(duration: 0.2), value: viewModel.toastMessage)
         }
     }
 
