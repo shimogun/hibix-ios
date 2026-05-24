@@ -71,7 +71,7 @@ struct MoodMemoView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button("スキップ") {
+            Button("戻る") {
                 onSkip()
             }
         }
