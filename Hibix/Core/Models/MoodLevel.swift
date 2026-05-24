@@ -21,6 +21,16 @@ nonisolated enum MoodLevel: Int, CaseIterable, Sendable {
         "気分\(rawValue)、\(displayName)"
     }
 
+    var iconName: String {
+        switch self {
+        case .down:    return "cloud.rain.fill"
+        case .calm:    return "cloud.fill"
+        case .neutral: return "circle.fill"
+        case .good:    return "sun.max.fill"
+        case .best:    return "sparkles"
+        }
+    }
+
     /// DBに保存された rawValue から MoodLevel を復元する。
     /// 旧 sink(2) は down(1) に、旧 uplift(6) は good(5) にマイグレーションする。
     static func fromStoredValue(_ rawValue: Int) -> MoodLevel? {
