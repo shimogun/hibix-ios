@@ -188,31 +188,89 @@ git commit -m "feat: MoodLevel を 7段階から5段階に集約 (rawValue維持
 
 ---
 
-## Task 2: MoodPickerView SF Symbol + ラベル + 既存タップ動作維持
+## Task 2: MoodPickerView カスタム画像アイコン + ラベル + 既存タップ動作維持
+
+> **方針変更 (2026-05-25)**: 当初は「SF Symbol + 背景色付き円」で実装したが、ブランドガイド v1.0
+> (`~/.company/secretary/notes/2026-05-25-hibix-brand-guideline.md` §11) で確定したカスタム mood アイコン PNG 5枚
+> (`moodicon_*.png`、オーナー作成) を採用する。背景色 + 表情が画像内で完結しているため、SF Symbol レイヤと背景 `Circle` は不要。
+> 旧 `iconName` (SF Symbol) プロパティは削除し、`iconAssetName` ("mood-down" 等、`Assets.xcassets/MoodIcons/` 配下) に置換する。
 
 **Files:**
 - Modify: `Hibix/Features/MoodEntry/MoodPickerView.swift`
-- Modify: `Hibix/Core/Models/MoodLevel.swift` (SF Symbol プロパティ追加)
+- Modify: `Hibix/Core/Models/MoodLevel.swift` (iconName 削除 → iconAssetName 追加)
+- Modify: `Hibix/Utilities/Color+MoodPalette.swift` (ブランド v1.0 5色 #86ADE5/#9BCCB5/#FECE7C/#FEB478/#FEACA5)
+- Create: `Hibix/Resources/Assets.xcassets/MoodIcons/mood-{down,calm,neutral,good,best}.imageset/`
+- Modify: `Hibix/Features/Home/HomeView.swift` (flyingReplica の SF Symbol 参照を画像版に)
+- Modify: `Hibix/Features/MoodEntry/MoodMemoView.swift` (moodBadge の SF Symbol 参照を画像版に)
 
-- [ ] **Step 1: Add iconName property to MoodLevel**
+- [ ] **Step 1: 素材コピー + Assets.xcassets/MoodIcons 配置**
 
-Edit `Hibix/Core/Models/MoodLevel.swift`, add after `accessibilityLabel`:
+```bash
+mkdir -p assets/branding Hibix/Resources/Assets.xcassets/MoodIcons
+cp ~/Desktop/Hibix_images/moodicon_skyblue.png      assets/branding/mood-down.png
+cp ~/Desktop/Hibix_images/moodicon_mintsage.png     assets/branding/mood-calm.png
+cp ~/Desktop/Hibix_images/moodicon_goldencream.png  assets/branding/mood-neutral.png
+cp ~/Desktop/Hibix_images/moodicon_sunsetorange.png assets/branding/mood-good.png
+cp ~/Desktop/Hibix_images/moodicon_coralpink.png    assets/branding/mood-best.png
+```
+
+各 `mood-*.imageset/` に Contents.json + PNG を配置（Universal / 1x のみ。原本が高解像のため scaledToFit で問題なし）。
+
+- [ ] **Step 2: MoodLevel.iconName を削除し iconAssetName を追加**
+
+Edit `Hibix/Core/Models/MoodLevel.swift`:
 
 ```swift
-    var iconName: String {
+    /// Assets.xcassets/MoodIcons/ 配下のアセット名 (ブランドガイド v1.0 §11)
+    var iconAssetName: String {
         switch self {
-        case .down:    return "cloud.rain.fill"
-        case .calm:    return "cloud.fill"
-        case .neutral: return "circle.fill"
-        case .good:    return "sun.max.fill"
-        case .best:    return "sparkles"
+        case .down:    return "mood-down"
+        case .calm:    return "mood-calm"
+        case .neutral: return "mood-neutral"
+        case .good:    return "mood-good"
+        case .best:    return "mood-best"
         }
     }
 ```
 
-- [ ] **Step 2: Replace MoodPickerView with new SF Symbol + label layout**
+(旧 `iconName` プロパティは削除)
 
-Replace `Hibix/Features/MoodEntry/MoodPickerView.swift` entire content:
+- [ ] **Step 2b: Color.moodColor をブランド v1.0 5色に更新**
+
+Edit `Hibix/Utilities/Color+MoodPalette.swift`:
+
+```swift
+extension Color {
+    static func moodColor(for level: MoodLevel) -> Color {
+        switch level {
+        case .down:    return Color(moodHex: 0x86ADE5) // スカイブルー
+        case .calm:    return Color(moodHex: 0x9BCCB5) // ミントセージ
+        case .neutral: return Color(moodHex: 0xFECE7C) // ゴールデンクリーム
+        case .good:    return Color(moodHex: 0xFEB478) // サンセットオレンジ
+        case .best:    return Color(moodHex: 0xFEACA5) // コーラルピンク
+        }
+    }
+    // ...既存 moodEmptyCell / init は維持
+}
+```
+
+- [ ] **Step 3: MoodPickerView を画像アイコン版に書き換え**
+
+Replace `MoodPickerButton` の ZStack 内 SF Symbol を画像に置換 (背景 Circle は除去 — 画像内で完結):
+
+```swift
+            ZStack {
+                Image(level.iconAssetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: diameter, height: diameter)
+                Circle()
+                    .strokeBorder(Color.primary, lineWidth: isSelected ? Self.selectionStrokeWidth : 0)
+                    .frame(width: diameter, height: diameter)
+            }
+```
+
+(以下、参考としての過去 SF Symbol 案を残置 — 採用しない)
 
 ```swift
 import SwiftUI
