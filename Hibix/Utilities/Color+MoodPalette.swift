@@ -1,15 +1,21 @@
 import SwiftUI
 
 extension Color {
+    /// Hibix Mood Colors (ブランドガイド v1.0 §6 確定値)
     static func moodColor(for level: MoodLevel) -> Color {
         switch level {
-        case .down:    return Color(moodHex: 0x4A5568)
-        case .calm:    return Color(moodHex: 0x38B2AC)
-        case .neutral: return Color(moodHex: 0xECC94B)
-        case .good:    return Color(moodHex: 0xF687B3)
-        case .best:    return Color(moodHex: 0xED8936)
+        case .down:    return Color(moodHex: 0x86ADE5) // スカイブルー
+        case .calm:    return Color(moodHex: 0x9BCCB5) // ミントセージ
+        case .neutral: return Color(moodHex: 0xFECE7C) // ゴールデンクリーム
+        case .good:    return Color(moodHex: 0xFEB478) // サンセットオレンジ
+        case .best:    return Color(moodHex: 0xFEACA5) // コーラルピンク
         }
     }
+
+    /// Brand primary (ロゴ「H」・主要UI) — スカイブルー
+    static var brandPrimary: Color { Color(moodHex: 0x86ADE5) }
+    /// Brand secondary (ロゴのハート・CTA) — コーラルピンク
+    static var brandSecondary: Color { Color(moodHex: 0xFEACA5) }
 
     static var moodEmptyCell: Color { Color(moodHex: 0xE5E7EB) }
 

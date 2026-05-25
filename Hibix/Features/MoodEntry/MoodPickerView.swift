@@ -48,13 +48,13 @@ private struct MoodPickerButton: View {
     var body: some View {
         VStack(spacing: 4) {
             ZStack {
-                Circle()
-                    .fill(Color.moodColor(for: level))
-                Image(systemName: level.iconName)
-                    .font(.system(size: diameter * 0.4, weight: .semibold))
-                    .foregroundStyle(.white)
+                Image(level.iconAssetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: diameter, height: diameter)
                 Circle()
                     .strokeBorder(Color.primary, lineWidth: isSelected ? Self.selectionStrokeWidth : 0)
+                    .frame(width: diameter, height: diameter)
             }
             .frame(width: diameter, height: diameter)
             .scaleEffect(isPressed ? 1.2 : (isSelected ? 1.08 : 1.0))

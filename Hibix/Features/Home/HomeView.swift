@@ -124,15 +124,11 @@ struct HomeView: View {
     }
 
     private func flyingReplica(for mood: MoodLevel) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color.moodColor(for: mood))
-                .frame(width: 96, height: 96)
-            Image(systemName: mood.iconName)
-                .font(.system(size: 40, weight: .bold))
-                .foregroundStyle(.white)
-        }
-        .shadow(color: .black.opacity(0.2), radius: 12)
+        Image(mood.iconAssetName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 96, height: 96)
+            .shadow(color: .black.opacity(0.2), radius: 12)
     }
 
     private var moodPickerSheet: some View {

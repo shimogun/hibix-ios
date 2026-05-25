@@ -47,10 +47,11 @@ struct EntryDetailView: View {
     private func displaySection(entry: MoodEntry) -> some View {
         VStack(alignment: .center, spacing: 16) {
             if let mood = entry.mood {
-                Circle()
-                    .fill(Color.moodColor(for: mood))
+                Image(mood.iconAssetName)
+                    .resizable()
+                    .scaledToFit()
                     .frame(width: 96, height: 96)
-                Text(mood.accessibilityLabel)
+                Text(mood.displayName)
                     .font(.title3)
                     .fontWeight(.semibold)
             }

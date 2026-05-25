@@ -45,4 +45,13 @@ struct MoodLevelTests {
         #expect(MoodLevel.good.displayName == "良い")
         #expect(MoodLevel.best.displayName == "最高")
     }
+
+    @Test
+    func iconAssetName_matchesBrandGuidelineMapping() {
+        #expect(MoodLevel.down.iconAssetName == "mood-down")
+        #expect(MoodLevel.calm.iconAssetName == "mood-calm")
+        #expect(MoodLevel.neutral.iconAssetName == "mood-neutral")
+        #expect(MoodLevel.good.iconAssetName == "mood-good")
+        #expect(MoodLevel.best.iconAssetName == "mood-best")
+    }
 }

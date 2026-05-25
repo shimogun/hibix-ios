@@ -21,13 +21,15 @@ nonisolated enum MoodLevel: Int, CaseIterable, Sendable {
         "気分\(rawValue)、\(displayName)"
     }
 
-    var iconName: String {
+    /// Assets.xcassets/MoodIcons/ 配下のアセット名。
+    /// ブランドガイド v1.0 §11 で確定したカスタム mood アイコン PNG を参照する。
+    var iconAssetName: String {
         switch self {
-        case .down:    return "cloud.rain.fill"
-        case .calm:    return "cloud.fill"
-        case .neutral: return "circle.fill"
-        case .good:    return "sun.max.fill"
-        case .best:    return "sparkles"
+        case .down:    return "mood-down"
+        case .calm:    return "mood-calm"
+        case .neutral: return "mood-neutral"
+        case .good:    return "mood-good"
+        case .best:    return "mood-best"
         }
     }
 
