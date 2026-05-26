@@ -90,16 +90,24 @@ struct EmergencyContactsView: View {
     }
 
     private func row(for contact: EmergencyContact) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(contact.label?.isEmpty == false ? (contact.label ?? "") : "(ラベルなし)")
-                .font(.body)
-                .foregroundStyle(.primary)
-            Text(contact.email)
-                .font(.footnote)
+        HStack(spacing: 12) {
+            Image(systemName: contact.contactType.iconName)
+                .font(.title3)
                 .foregroundStyle(.secondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(contact.label?.isEmpty == false ? (contact.label ?? "") : "(ラベルなし)")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                Text(contact.email)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(contact.contactType.displayName) \(contact.displayTitle)")
     }
 }
 

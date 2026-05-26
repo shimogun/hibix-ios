@@ -29,16 +29,41 @@ struct EmergencyContactEditView: View {
         @Bindable var bindable = viewModel
         NavigationStack {
             Form {
-                Section("メールアドレス") {
-                    TextField("example@example.com", text: $bindable.email)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.emailAddress)
+                Section("連絡種別") {
+                    Picker("連絡種別", selection: $bindable.contactType) {
+                        ForEach(ContactType.allCases, id: \.self) { type in
+                            Label(type.displayName, systemImage: type.iconName).tag(type)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxHeight: 120)
+                    .accessibilityLabel("連絡種別を選択")
+                }
+
+                Section(viewModel.contactType.fieldLabel) {
+                    TextField(viewModel.contactType.placeholder, text: $bindable.value)
+                        .keyboardType(keyboardType(for: viewModel.contactType))
+                        .textContentType(textContentType(for: viewModel.contactType))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
+
                 Section("ラベル (任意)") {
                     TextField("例: お母さん", text: $bindable.label)
                         .textInputAutocapitalization(.words)
+                }
+
+                if !viewModel.contactType.isDeliveredInV01 {
+                    Section {
+                        Label {
+                            Text("\(viewModel.contactType.displayName) 種別は登録のみで、実際の通知送信は今後のアップデートで対応予定です。現在はメール宛のみ即時送信されます。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } icon: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 if let message = viewModel.saveErrorMessage {
@@ -95,6 +120,22 @@ struct EmergencyContactEditView: View {
                     }
                 )
             }
+        }
+    }
+
+    private func keyboardType(for type: ContactType) -> UIKeyboardType {
+        switch type {
+        case .email: return .emailAddress
+        case .line:  return .default
+        case .phone: return .phonePad
+        }
+    }
+
+    private func textContentType(for type: ContactType) -> UITextContentType? {
+        switch type {
+        case .email: return .emailAddress
+        case .line:  return nil
+        case .phone: return .telephoneNumber
         }
     }
 }

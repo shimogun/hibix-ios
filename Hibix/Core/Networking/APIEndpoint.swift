@@ -99,6 +99,8 @@ nonisolated struct SettingsPatchBody: Encodable {
 nonisolated struct ContactInputBody: Encodable {
     let email: String
     let label: String?
+    /// 連絡種別 (F-07 v0.2)。"email"/"line"/"phone"。サーバー側で送信ロジックを分岐する。
+    let kind: String
 }
 
 nonisolated struct ContactsPutBody: Encodable {

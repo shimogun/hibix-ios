@@ -17,7 +17,8 @@ final class EmergencyContactEditViewModel {
         }
     }
 
-    var email: String
+    var contactType: ContactType
+    var value: String
     var label: String
 
     var isPaywallPresented: Bool = false
@@ -38,10 +39,12 @@ final class EmergencyContactEditViewModel {
         self.entitlement = entitlement
         switch mode {
         case .new:
-            self.email = ""
+            self.contactType = .email
+            self.value = ""
             self.label = ""
         case .existing(let contact):
-            self.email = contact.email
+            self.contactType = contact.contactType
+            self.value = contact.email
             self.label = contact.label ?? ""
         }
     }
@@ -51,18 +54,22 @@ final class EmergencyContactEditViewModel {
         return false
     }
 
-    var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
+    var trimmedValue: String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var trimmedLabel: String {
+        label.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var isInputValid: Bool {
-        Self.isValidEmail(trimmedEmail)
+        Self.isValid(contactType: contactType, value: trimmedValue)
     }
 
     /// 保存を試みる。無料なら Paywall を出して return。成功で true。
     func save() async -> Bool {
         guard isInputValid else {
-            saveErrorMessage = "メールアドレスの形式が正しくありません"
+            saveErrorMessage = Self.invalidMessage(for: contactType)
             return false
         }
         if !entitlement.isPro {
@@ -75,14 +82,14 @@ final class EmergencyContactEditViewModel {
         do {
             switch mode {
             case .new:
-                _ = try await repo.add(contactType: .email,
-                                       value: trimmedEmail,
+                _ = try await repo.add(contactType: contactType,
+                                       value: trimmedValue,
                                        label: label,
                                        now: Date())
             case .existing(let contact):
                 try await repo.update(id: contact.id,
-                                      contactType: .email,
-                                      value: trimmedEmail,
+                                      contactType: contactType,
+                                      value: trimmedValue,
                                       label: label)
             }
             return true
@@ -108,11 +115,29 @@ final class EmergencyContactEditViewModel {
         }
     }
 
-    private static func isValidEmail(_ s: String) -> Bool {
-        guard !s.isEmpty, s.count <= 254 else { return false }
-        // ローカル部: @ と空白を含まない 1 文字以上
-        // ドメイン部: @ と空白とドットを含まない 1 文字以上 + . + 英字 2 文字以上の TLD
-        let pattern = #"^[^@\s]+@[^@\s.]+\.[A-Za-z]{2,}$"#
-        return s.range(of: pattern, options: .regularExpression) != nil
+    nonisolated static func isValid(contactType: ContactType, value: String) -> Bool {
+        guard !value.isEmpty, value.count <= 254 else { return false }
+        switch contactType {
+        case .email:
+            let pattern = #"^[^@\s]+@[^@\s.]+\.[A-Za-z]{2,}$"#
+            return value.range(of: pattern, options: .regularExpression) != nil
+        case .line:
+            // v0.1 は緩めのバリデーション (空でなければOK・トリム後 1 文字以上)
+            return true
+        case .phone:
+            // 数字・ハイフン・スペース・括弧・+ のみ許容、数字を 5 文字以上含む
+            let allowedPattern = #"^[0-9+\-\s()]+$"#
+            guard value.range(of: allowedPattern, options: .regularExpression) != nil else { return false }
+            let digitCount = value.filter(\.isNumber).count
+            return digitCount >= 5
+        }
+    }
+
+    private static func invalidMessage(for type: ContactType) -> String {
+        switch type {
+        case .email: return "メールアドレスの形式が正しくありません"
+        case .line:  return "LINE ID または URL を入力してください"
+        case .phone: return "電話番号の形式が正しくありません"
+        }
     }
 }
