@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>サポート — Hibix</title>
+  <meta name="description" content="Hibix のサポートページ。よくある質問と問い合わせ先。" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #1c1c1e;
+      --muted: #6c6c70;
+      --accent: #86ADE5;
+      --border: #e5e5ea;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e;
+        --fg: #f2f2f7;
+        --muted: #98989d;
+        --border: #38383a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      line-height: 1.75;
+      color: var(--fg);
+      background: var(--bg);
+      -webkit-text-size-adjust: 100%;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin: 0 0 8px;
+    }
+    h2 {
+      font-size: 1.15rem;
+      margin: 32px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 1rem;
+      margin: 20px 0 4px;
+    }
+    p, ul, ol {
+      font-size: 0.95rem;
+      margin: 8px 0;
+    }
+    ul, ol { padding-left: 1.4em; }
+    li { margin: 4px 0; }
+    .meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+    .contact-card {
+      padding: 16px;
+      background: rgba(134, 173, 229, 0.08);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      margin: 16px 0;
+      font-size: 0.95rem;
+    }
+    .contact-card strong { display: block; margin-bottom: 4px; }
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    a { color: var(--accent); }
+    code {
+      background: rgba(134, 173, 229, 0.12);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Hibix サポート</h1>
+    <p class="meta">最終更新日: 2026年5月26日</p>
+
+    <p>Hibix をご利用いただきありがとうございます。本ページでは、よくいただくご質問と、サポート窓口をご案内します。</p>
+
+    <h2>お問い合わせ窓口</h2>
+    <div class="contact-card">
+      <strong>メール</strong>
+      <a href="mailto:support@hibix.app">support@hibix.app</a>
+      <br />
+      <span style="color: var(--muted); font-size: 0.85rem;">通常 2〜3 営業日以内にご返信いたします。</span>
+    </div>
+
+    <h2>よくあるご質問</h2>
+
+    <h3>Q1. 機種変更しても気分の履歴は引き継がれますか?</h3>
+    <p>
+      気分・メモ・ピクセルカレンダーの履歴は <strong>各 iPhone 端末のローカル</strong> にのみ保存されています。
+      機種変更時は、<a href="https://support.apple.com/ja-jp/HT203070">Apple のクイックスタート</a>または
+      iCloud バックアップ経由でアプリデータが移行されると、新しい端末に履歴が引き継がれます。
+      購入状態（Hibix Pro）は iCloud Keychain で同期されているため、App Store から購入復元ボタンを押すだけで復元されます。
+    </p>
+
+    <h3>Q2. 緊急連絡先に通知が届きません</h3>
+    <p>以下をご確認ください。</p>
+    <ul>
+      <li>見守りモードが「ゆるつながり」または「まいにち共有」になっているか</li>
+      <li>緊急連絡先のメールアドレスが正しく登録されているか</li>
+      <li>「迷惑メール」フォルダに振り分けられていないか（送信元: <code>noreply@hibix.app</code>）</li>
+      <li>v0.1 では、LINE / 電話の種別は <strong>登録のみで実送信は今後のアップデートで対応予定</strong> です。現時点で実送信されるのはメール種別のみです。</li>
+    </ul>
+
+    <h3>Q3. ロック画面で通知が表示されません</h3>
+    <p>
+      iOS の「設定 → 通知 → Hibix」から、通知の許可状態と通知スタイルをご確認ください。
+      朝/夜のリマインダー通知は、本アプリ内の「設定 → 通知時間」で個別に時刻を変更できます。
+    </p>
+
+    <h3>Q4. Hibix Pro を購入しましたが、機能が解放されません</h3>
+    <p>
+      App Store の購入処理に時間がかかっている可能性があります。
+      設定 → アカウント → 「購入を復元」をタップしてしばらくお待ちください。
+      数分待っても解放されない場合は、上記サポートメールまでご連絡ください。
+    </p>
+
+    <h3>Q5. データを完全に削除したい</h3>
+    <p>
+      アプリ内の「設定 → アカウントとデータ → 全データ削除」より、いつでも削除を申請できます。
+      申請後 48 時間以内に当方サーバー上のすべての関連データを物理削除します。
+      48 時間の猶予期間中は誤操作の取消も可能です。
+    </p>
+
+    <h3>Q6. 通知メールに記載される医療目的でない旨について</h3>
+    <p>
+      Hibix は医療機器ではなく、診断・治療・予防を目的としたアプリではありません。
+      また、安否確認機能は緊急通報サービスを代替するものではありません。
+      緊急時は 119（消防・救急）等の公的サービスへ直接ご連絡ください。
+      心身に不調を感じる場合は、必ず医療機関にご相談ください。
+    </p>
+
+    <h2>動作環境</h2>
+    <ul>
+      <li>iOS 17.0 以降</li>
+      <li>iPhone のみ対応（iPad/Apple Watch 非対応）</li>
+      <li>iCloud Keychain が有効であることを推奨</li>
+    </ul>
+
+    <h2>関連リンク</h2>
+    <ul>
+      <li><a href="./privacy.html">プライバシーポリシー</a></li>
+    </ul>
+
+    <footer>
+      © 2026 しもぐん / Hibix
+    </footer>
+  </main>
+</body>
+</html>
