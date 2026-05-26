@@ -4,13 +4,14 @@ import GRDB
 protocol EmergencyContactsRepositoryProtocol: Sendable {
     func count() async throws -> Int
     func list() async throws -> [EmergencyContact]
-    func add(email: String, label: String?, now: Date) async throws -> EmergencyContact
-    func update(id: Int64, email: String, label: String?) async throws
+    func add(contactType: ContactType, value: String, label: String?, now: Date) async throws -> EmergencyContact
+    func update(id: Int64, contactType: ContactType, value: String, label: String?) async throws
     func delete(id: Int64) async throws
 }
 
 /// `emergency_contacts` テーブルへのアクセス (PRD v2.2.0 §6 F-07)。
 /// サーバー暗号化(C-03 / AES-256-GCM)は STEP7 の PUT /api/contacts で扱う。
+/// v0.2: contact_type カラムを追加 (email/line/phone)。v0.1 既存レコードは email として保持。
 final class EmergencyContactsRepository: EmergencyContactsRepositoryProtocol {
     private let writer: any DatabaseWriter
 
@@ -27,7 +28,7 @@ final class EmergencyContactsRepository: EmergencyContactsRepositoryProtocol {
     nonisolated func list() async throws -> [EmergencyContact] {
         try await writer.read { db in
             let rows = try Row.fetchAll(db, sql: """
-                SELECT id, email, label, sort_order, created_at
+                SELECT id, email, label, sort_order, created_at, contact_type
                 FROM emergency_contacts
                 ORDER BY sort_order ASC, id ASC
                 """)
@@ -35,8 +36,11 @@ final class EmergencyContactsRepository: EmergencyContactsRepositoryProtocol {
         }
     }
 
-    nonisolated func add(email: String, label: String?, now: Date = Date()) async throws -> EmergencyContact {
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    nonisolated func add(contactType: ContactType,
+                         value: String,
+                         label: String?,
+                         now: Date = Date()) async throws -> EmergencyContact {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedLabel = label?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedLabel = (trimmedLabel?.isEmpty ?? true) ? nil : trimmedLabel
         let createdAt = HibixDate.iso8601String(from: now)
@@ -44,13 +48,14 @@ final class EmergencyContactsRepository: EmergencyContactsRepositoryProtocol {
             let maxOrder = try Int.fetchOne(db, sql: "SELECT MAX(sort_order) FROM emergency_contacts") ?? -1
             let nextOrder = maxOrder + 1
             try db.execute(sql: """
-                INSERT INTO emergency_contacts (email, label, sort_order, created_at)
-                VALUES (?, ?, ?, ?)
-                """, arguments: [trimmedEmail, normalizedLabel, nextOrder, createdAt])
+                INSERT INTO emergency_contacts (email, label, sort_order, created_at, contact_type)
+                VALUES (?, ?, ?, ?, ?)
+                """, arguments: [trimmedValue, normalizedLabel, nextOrder, createdAt, contactType.rawValue])
             let id = db.lastInsertedRowID
             return EmergencyContact(
                 id: id,
-                email: trimmedEmail,
+                contactType: contactType,
+                email: trimmedValue,
                 label: normalizedLabel,
                 sortOrder: nextOrder,
                 createdAt: now
@@ -58,16 +63,19 @@ final class EmergencyContactsRepository: EmergencyContactsRepositoryProtocol {
         }
     }
 
-    nonisolated func update(id: Int64, email: String, label: String?) async throws {
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    nonisolated func update(id: Int64,
+                            contactType: ContactType,
+                            value: String,
+                            label: String?) async throws {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedLabel = label?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedLabel = (trimmedLabel?.isEmpty ?? true) ? nil : trimmedLabel
         try await writer.write { db in
             try db.execute(sql: """
                 UPDATE emergency_contacts
-                SET email = ?, label = ?
+                SET email = ?, label = ?, contact_type = ?
                 WHERE id = ?
-                """, arguments: [trimmedEmail, normalizedLabel, id])
+                """, arguments: [trimmedValue, normalizedLabel, contactType.rawValue, id])
         }
     }
 
@@ -86,8 +94,11 @@ final class EmergencyContactsRepository: EmergencyContactsRepositoryProtocol {
             return nil
         }
         let label: String? = row["label"]
+        let contactTypeRaw: String? = row["contact_type"]
+        let contactType = ContactType.fromStoredValue(contactTypeRaw)
         return EmergencyContact(
             id: id,
+            contactType: contactType,
             email: email,
             label: label,
             sortOrder: sortOrder,

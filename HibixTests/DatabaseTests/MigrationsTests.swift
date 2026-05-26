@@ -25,7 +25,7 @@ struct MigrationsTests {
             #expect(settingsColumns == ["key", "value", "updated_at"])
 
             let contactsColumns = Set(try db.columns(in: "emergency_contacts").map(\.name))
-            #expect(contactsColumns == ["id", "email", "label", "sort_order", "created_at"])
+            #expect(contactsColumns == ["id", "email", "label", "sort_order", "created_at", "contact_type"])
 
             let indexNames = try db.indexes(on: "mood_entries").map(\.name)
             #expect(indexNames.contains("idx_mood_entries_date"))

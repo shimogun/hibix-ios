@@ -75,9 +75,15 @@ final class EmergencyContactEditViewModel {
         do {
             switch mode {
             case .new:
-                _ = try await repo.add(email: trimmedEmail, label: label, now: Date())
+                _ = try await repo.add(contactType: .email,
+                                       value: trimmedEmail,
+                                       label: label,
+                                       now: Date())
             case .existing(let contact):
-                try await repo.update(id: contact.id, email: trimmedEmail, label: label)
+                try await repo.update(id: contact.id,
+                                      contactType: .email,
+                                      value: trimmedEmail,
+                                      label: label)
             }
             return true
         } catch {

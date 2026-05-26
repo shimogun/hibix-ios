@@ -35,6 +35,13 @@ enum Migrations {
                 """)
         }
 
+        migrator.registerMigration("v2_emergency_contact_add_kind") { db in
+            try db.execute(sql: """
+                ALTER TABLE emergency_contacts
+                ADD COLUMN contact_type TEXT NOT NULL DEFAULT 'email'
+                """)
+        }
+
         return migrator
     }
 }
