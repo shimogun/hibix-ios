@@ -45,6 +45,6 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>HIBIX_API_BASE_URL</key>
-	<string>https://domestic-mart-closely-elite.trycloudflare.com</string>
+	<string>https://api.hibix.app</string>
 </dict>
 </plist>
