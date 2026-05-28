@@ -51,6 +51,16 @@ https://hibix.app/support.html
 
 ## App Store Connect 入力チェックリスト
 
-- [ ] アプリ情報 → プライバシーポリシーURL: `https://hibix.app/privacy.html`
-- [ ] アプリ情報 → サポートURL: `https://hibix.app/support.html`
-- [ ] アプリ情報 → マーケティングURL（任意）: `https://hibix.app/`（LP がなければサポート URL と同じでも可）
+Cloudflare Pages が `.html` を自動的に削除する canonical URL を提供するため、
+入力欄には拡張子なしの URL を使用する。
+
+- [ ] アプリ情報 → プライバシーポリシーURL: `https://hibix.app/privacy`
+- [ ] アプリ情報 → サポートURL: `https://hibix.app/support`
+- [ ] アプリ情報 → マーケティングURL（任意）: `https://hibix.app/support`（LP がなければサポート URL と同じで可）
+
+## デプロイ状態（実績）
+
+- 公開日: 2026-05-29 JST
+- デプロイ方式: Cloudflare Pages (Direct Upload)
+- プロジェクト名: `hibix-website`
+- 動作確認: `curl -sI https://hibix.app/privacy` → 200 / `text/html` / `server: cloudflare`
