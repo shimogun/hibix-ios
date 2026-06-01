@@ -4,6 +4,7 @@ import SwiftUI
 /// モード切替 / 緊急連絡先 / アプリロック の編集画面は STEP6.2-6.4 で接続。
 struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
+    @State private var isHelpPresented: Bool = false
     @Bindable private var entitlement: EntitlementManager
     let onDismiss: () -> Void
 
@@ -24,6 +25,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 accountSection
+                helpSection
                 appearanceSection
                 watchSection
                 securitySection
@@ -36,6 +38,11 @@ struct SettingsView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("閉じる", action: onDismiss)
                 }
+            }
+            .sheet(isPresented: $isHelpPresented) {
+                OnboardingFlow(dependencies: dependencies, mode: .review, onClose: {
+                    isHelpPresented = false
+                })
             }
             .task {
                 await viewModel.load()
@@ -80,6 +87,17 @@ struct SettingsView: View {
                 }
             }
             .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var helpSection: some View {
+        Section {
+            Button {
+                isHelpPresented = true
+            } label: {
+                Label("使い方をもう一度見る", systemImage: "questionmark.circle")
+            }
+            .accessibilityHint("オンボーディングを最初から見直します")
         }
     }
 
