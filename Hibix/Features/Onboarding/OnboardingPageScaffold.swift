@@ -35,6 +35,7 @@ struct OnboardingPageScaffold<Illustration: View, Extra: View>: View {
                     .foregroundStyle(Color.hibixSubNavy)
                     .multilineTextAlignment(.center)
             }
+            .accessibilityElement(children: .combine)
             extra
             Spacer(minLength: 0)
         }

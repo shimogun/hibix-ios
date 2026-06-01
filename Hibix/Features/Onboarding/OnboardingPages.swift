@@ -299,7 +299,7 @@ private struct WatchFlowStep: View {
 }
 
 private struct ProCompareTable: View {
-    private struct Row: Identifiable { let id = UUID(); let label: String; let free: String; let pro: String }
+    private struct Row: Identifiable { var id: String { label }; let label: String; let free: String; let pro: String }
     private let rows = [
         Row(label: "基本記録", free: "✓", pro: "✓"),
         Row(label: "見守り", free: "一部", pro: "全解放"),
