@@ -10,9 +10,9 @@ struct RootView: View {
             case .none:
                 splash
             case .some(false):
-                OnboardingFlow(dependencies: dependencies) {
+                OnboardingFlow(dependencies: dependencies, mode: .firstRun, onCompleted: {
                     dependencies.markOnboardingDone()
-                }
+                })
             case .some(true):
                 HomeView(dependencies: dependencies)
             }
