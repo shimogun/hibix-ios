@@ -31,6 +31,7 @@ struct OnboardingViewModelTests {
         #expect(spy.saved == [.solo])
         #expect(spy.completed == true)
         #expect(vm.isPaywallPresented == false)
+        #expect(spy.notificationsRequested == false)
     }
 
     @Test
@@ -50,6 +51,7 @@ struct OnboardingViewModelTests {
         #expect(spy.saved == [.daily])
         #expect(spy.completed == true)
         #expect(vm.isPaywallPresented == false)
+        #expect(spy.notificationsRequested == false)
     }
 
     @Test
@@ -72,5 +74,6 @@ struct OnboardingViewModelTests {
         #expect(spy.saved == [.solo])
         #expect(spy.completed == true)
         #expect(vm.pendingProMode == nil)
+        #expect(spy.notificationsRequested == false)
     }
 }

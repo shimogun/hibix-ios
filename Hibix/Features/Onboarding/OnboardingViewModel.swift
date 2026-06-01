@@ -17,6 +17,7 @@ final class OnboardingViewModel {
 
     @ObservationIgnored private let isProProvider: () -> Bool
     @ObservationIgnored private let saveMode: (WatchMode) async -> Void
+    /// 通知許可はPro購入後セットアップでのみ要求する（spec §5）。solo/未購入パスでは要求しない（意図的）。
     @ObservationIgnored private let requestNotifications: () async -> Void
     @ObservationIgnored private let markComplete: () async -> Void
 
@@ -46,6 +47,7 @@ final class OnboardingViewModel {
 
     /// ペイウォールで購入完了。保留中のProモードを確定→通知許可→完了。
     func handlePurchaseCompleted() async {
+        // .solo は防御的デフォルト（本来 selectStartMode で pending な Pro モードが設定された後にのみ到達する）。
         let mode = pendingProMode ?? .solo
         await saveMode(mode)
         await requestNotifications()
