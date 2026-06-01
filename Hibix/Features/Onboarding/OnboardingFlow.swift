@@ -3,58 +3,125 @@ import os.log
 
 struct OnboardingFlow: View {
     let dependencies: AppDependencies
+    let mode: OnboardingViewModel.Mode
     let onCompleted: () -> Void
+    let onClose: () -> Void
 
+    @State private var viewModel: OnboardingViewModel
     @State private var pageIndex: Int = 0
-    @State private var isRequestingAuthorization: Bool = false
-    @State private var didDecideAuthorization: Bool = false
-    @State private var authorizationGranted: Bool = false
-    @State private var isFinishing: Bool = false
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Onboarding")
-    private static let pageCount: Int = 3
+    /// firstRun=9ページ(0..8) / review=8ページ(0..7、開始ページ⑨を除外)
+    private var pageCount: Int { mode == .review ? 8 : 9 }
+    private var isLastPage: Bool { pageIndex == pageCount - 1 }
+
+    init(dependencies: AppDependencies,
+         mode: OnboardingViewModel.Mode = .firstRun,
+         onCompleted: @escaping () -> Void = {},
+         onClose: @escaping () -> Void = {}) {
+        self.dependencies = dependencies
+        self.mode = mode
+        self.onCompleted = onCompleted
+        self.onClose = onClose
+
+        let settings = dependencies.settingsRepository
+        let entitlement = dependencies.entitlementManager
+        let scheduler = dependencies.notificationScheduler
+        let complete = onCompleted
+        _viewModel = State(initialValue: OnboardingViewModel(
+            mode: mode,
+            isPro: { entitlement.isPro },
+            saveMode: { selected in
+                do {
+                    try await settings.setString(selected.rawValue, forKey: .watchMode, now: Date())
+                } catch {
+                    OnboardingFlow.logger.error("watch_mode write failed: \(error.localizedDescription, privacy: .public)")
+                }
+            },
+            requestNotifications: {
+                let granted = await scheduler.requestAuthorization()
+                if granted { await scheduler.rescheduleDailyNotifications() }
+            },
+            markComplete: {
+                do {
+                    try await settings.setBool(true, forKey: .onboardingDone, now: Date())
+                } catch {
+                    OnboardingFlow.logger.error("onboarding_done write failed: \(error.localizedDescription, privacy: .public)")
+                }
+                complete()
+            }
+        ))
+    }
 
     var body: some View {
+        @Bindable var bindable = viewModel
         VStack(spacing: 16) {
+            if mode == .review {
+                HStack {
+                    Spacer()
+                    Button("閉じる") { onClose() }
+                        .fontWeight(.semibold)
+                        .tint(Color.hibixNavy)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                }
+            }
+
             TabView(selection: $pageIndex) {
-                OnboardingConceptPage()
-                    .tag(0)
-                OnboardingWatchPage()
-                    .tag(1)
-                OnboardingPermissionPage(
-                    isRequestingAuthorization: isRequestingAuthorization,
-                    didDecideAuthorization: didDecideAuthorization,
-                    authorizationGranted: authorizationGranted,
-                    onAllow: { Task { await requestAuthorization() } },
-                    onSkip: { skipAuthorization() },
-                    onStart: { Task { await finish() } }
-                )
-                .tag(2)
+                OnboardingConceptPage().tag(0)
+                OnboardingMoodPage().tag(1)
+                OnboardingCalendarPage().tag(2)
+                OnboardingWatchModePage().tag(3)
+                OnboardingSafetyPage().tag(4)
+                OnboardingPrivacyPage().tag(5)
+                OnboardingAppLockPage().tag(6)
+                OnboardingProPage().tag(7)
+                if mode != .review {
+                    OnboardingStartPage(onSelectMode: { selected in
+                        Task { await viewModel.selectStartMode(selected) }
+                    })
+                    .tag(8)
+                }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut, value: pageIndex)
 
             pagination
 
-            if pageIndex < Self.pageCount - 1 {
+            if !isLastPage {
                 Button(action: advance) {
                     Text("次へ")
                         .font(.body)
                         .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .foregroundStyle(Color.hibixNavy)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .hibixRoundButton(cornerRadius: 25)
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal, 24)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 28)
             }
         }
-        .padding(.vertical, 24)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .hibixWatercolorBackground()
+        .sheet(isPresented: $bindable.isPaywallPresented) {
+            PaywallView(
+                viewModel: PaywallViewModel(entitlement: dependencies.entitlementManager),
+                onPurchaseCompleted: {
+                    Task { await viewModel.handlePurchaseCompleted() }
+                },
+                onDismiss: {
+                    Task { await viewModel.handlePaywallDismissedWithoutPurchase() }
+                }
+            )
+        }
     }
 
     private var pagination: some View {
         HStack(spacing: 8) {
-            ForEach(0..<Self.pageCount, id: \.self) { index in
+            ForEach(0..<pageCount, id: \.self) { index in
                 Circle()
-                    .fill(index == pageIndex ? Color.primary : Color.secondary.opacity(0.3))
+                    .fill(index == pageIndex ? Color.hibixNavy : Color.hibixPeriwinkle.opacity(0.35))
                     .frame(width: 8, height: 8)
             }
         }
@@ -62,35 +129,7 @@ struct OnboardingFlow: View {
     }
 
     private func advance() {
-        guard pageIndex < Self.pageCount - 1 else { return }
+        guard pageIndex < pageCount - 1 else { return }
         pageIndex += 1
-    }
-
-    private func requestAuthorization() async {
-        guard !isRequestingAuthorization else { return }
-        isRequestingAuthorization = true
-        let granted = await dependencies.notificationScheduler.requestAuthorization()
-        authorizationGranted = granted
-        didDecideAuthorization = true
-        isRequestingAuthorization = false
-        if granted {
-            await dependencies.notificationScheduler.rescheduleDailyNotifications()
-        }
-    }
-
-    private func skipAuthorization() {
-        authorizationGranted = false
-        didDecideAuthorization = true
-    }
-
-    private func finish() async {
-        guard !isFinishing else { return }
-        isFinishing = true
-        do {
-            try await dependencies.settingsRepository.setBool(true, forKey: .onboardingDone)
-        } catch {
-            Self.logger.error("onboarding_done write failed: \(error.localizedDescription, privacy: .public)")
-        }
-        onCompleted()
     }
 }
