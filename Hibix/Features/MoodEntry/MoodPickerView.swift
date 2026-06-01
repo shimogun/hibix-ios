@@ -53,7 +53,7 @@ private struct MoodPickerButton: View {
                     .scaledToFit()
                     .frame(width: diameter, height: diameter)
                 Circle()
-                    .strokeBorder(Color.primary, lineWidth: isSelected ? Self.selectionStrokeWidth : 0)
+                    .strokeBorder(Color.hibixPeriwinkle, lineWidth: isSelected ? Self.selectionStrokeWidth : 0)
                     .frame(width: diameter, height: diameter)
             }
             .frame(width: diameter, height: diameter)
@@ -87,7 +87,7 @@ private struct MoodPickerButton: View {
             Text(isSelected ? level.displayName : "")
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.hibixNavy)
                 .frame(height: Self.labelHeight)
                 .accessibilityHidden(true)
         }

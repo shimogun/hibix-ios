@@ -39,14 +39,22 @@ struct HomeView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .hibixWatercolorBackground()
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         isSettingsPresented = true
                     } label: {
                         Image(systemName: "gearshape")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.hibixSubNavy)
+                            .frame(width: 40, height: 40)
+                            .hibixRoundButton(cornerRadius: 20)
                     }
+                    .buttonStyle(.plain)
                     .accessibilityLabel("設定")
                 }
             }
@@ -64,6 +72,7 @@ struct HomeView: View {
             }
             .sheet(isPresented: $isMoodPickerSheetPresented) {
                 moodPickerSheet
+                    .preferredColorScheme(dependencies.appearanceManager.preferredColorScheme)
             }
             .sheet(isPresented: $bindable.isMemoSheetPresented) {
                 MoodMemoView(
@@ -76,6 +85,7 @@ struct HomeView: View {
                         viewModel.dismissMemoSheet()
                     }
                 )
+                .preferredColorScheme(dependencies.appearanceManager.preferredColorScheme)
             }
             .sheet(isPresented: $bindable.isPaywallPresented) {
                 PaywallView(
@@ -136,7 +146,8 @@ struct HomeView: View {
             VStack(spacing: 24) {
                 Text("今日の気分を選んでください")
                     .font(.title3)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.hibixNavy)
                 MoodPickerView(
                     selected: viewModel.todayEntry?.mood,
                     onSelect: { level in
@@ -156,11 +167,16 @@ struct HomeView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .hibixWatercolorBackground()
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("閉じる") {
                         isMoodPickerSheetPresented = false
                     }
+                    .fontWeight(.semibold)
+                    .tint(Color.hibixNavy)
                 }
             }
         }
@@ -170,15 +186,18 @@ struct HomeView: View {
         VStack(spacing: 6) {
             Text(HibixDate.todayString())
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.hibixPeriwinkle)
             if let mood = viewModel.todayEntry?.mood {
                 Text("今日: \(mood.displayName)")
                     .font(.title2)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.hibixNavy)
             } else {
                 Text("今日の気分を記録")
                     .font(.title2)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.hibixNavy)
             }
         }
         .accessibilityElement(children: .combine)

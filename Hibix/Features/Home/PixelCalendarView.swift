@@ -60,18 +60,18 @@ struct PixelCalendarView: View {
             VStack(spacing: 8) {
                 Image(systemName: "lock.fill")
                     .font(.title2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hibixSubNavy)
                 Text("全期間を見る")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.hibixSubText)
                     .multilineTextAlignment(.center)
             }
             .frame(width: Self.upgradeStripWidth,
                    height: CGFloat(PixelCalendarGeometry.rowCount) * Self.cellSize
                         + CGFloat(PixelCalendarGeometry.rowCount - 1) * Self.cellSpacing
                         + Self.monthHeaderHeight + 4)
-            .background(Color(uiColor: .secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .hibixGlassCard(cornerRadius: 12)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Pro にアップグレードして全期間を表示")
@@ -86,7 +86,8 @@ struct PixelCalendarView: View {
                         if let label = monthLabelIfTransition(at: col) {
                             Text(label)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.hibixPeriwinkle)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                     }
@@ -130,7 +131,7 @@ struct PixelCalendarView: View {
             Button {
                 onSelectDate(dateString)
             } label: {
-                CalendarCell(color: mood.map { Color.moodColor(for: $0) } ?? Color.moodEmptyCell,
+                CalendarCell(color: mood.map { Color.moodColor(for: $0) } ?? Color.hibixCellBase.opacity(0.8),
                              isToday: isToday)
                     .frame(width: Self.cellSize, height: Self.cellSize)
             }
@@ -147,13 +148,17 @@ private struct CalendarCell: View {
     let color: Color
     let isToday: Bool
 
+    private static let cornerRadius: CGFloat = 10
+
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
                 .fill(color)
+            RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                .strokeBorder(Color.hibixCellBorder, lineWidth: 1)
             if isToday {
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.primary, lineWidth: 2)
+                RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                    .strokeBorder(Color.hibixPeriwinkle, lineWidth: 2)
             }
         }
     }
