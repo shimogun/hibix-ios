@@ -22,8 +22,10 @@ struct MoodMemoView: View {
                 counter
             }
             .padding(16)
-            .navigationTitle("今日のメモ")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .hibixWatercolorBackground()
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar { toolbarContent }
             .onAppear {
                 text = initialMemo ?? ""
@@ -42,6 +44,8 @@ struct MoodMemoView: View {
                     .frame(width: 32, height: 32)
                 Text(mood.displayName)
                     .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.hibixNavy)
                 Spacer()
             }
         }
@@ -51,10 +55,13 @@ struct MoodMemoView: View {
         TextEditor(text: $text)
             .focused($isEditorFocused)
             .font(.body)
+            .fontWeight(.medium)
+            .foregroundStyle(Color.hibixNavy)
+            .tint(Color.hibixNavy)
             .scrollContentBackground(.hidden)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(12)
             .frame(minHeight: 200)
+            .hibixGlassCard(cornerRadius: 28)
             .accessibilityLabel("メモ入力")
     }
 
@@ -63,7 +70,8 @@ struct MoodMemoView: View {
             Spacer()
             Text("\(characterCount) / \(Self.characterLimit)")
                 .font(.caption)
-                .foregroundStyle(isOverLimit ? .red : .secondary)
+                .fontWeight(.medium)
+                .foregroundStyle(isOverLimit ? Color.red : Color.hibixCounterText)
                 .monospacedDigit()
                 .accessibilityLabel("文字数 \(characterCount) / \(Self.characterLimit)")
         }
@@ -71,18 +79,41 @@ struct MoodMemoView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Text("今日のメモ")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.hibixNavy)
+        }
         ToolbarItem(placement: .topBarLeading) {
-            Button("戻る") {
+            Button {
                 onSkip()
+            } label: {
+                pillLabel("戻る")
             }
+            .buttonStyle(.plain)
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Button("保存") {
+            Button {
                 Task { await onSave(text) }
+            } label: {
+                pillLabel("保存")
             }
-            .fontWeight(.semibold)
+            .buttonStyle(.plain)
             .disabled(isOverLimit)
         }
+    }
+
+    private func pillLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundStyle(Color.hibixNavy)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .hibixRoundButton(cornerRadius: 18)
     }
 }
 
