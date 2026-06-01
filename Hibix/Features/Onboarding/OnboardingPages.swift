@@ -219,7 +219,7 @@ struct OnboardingStartPage: View {
 // MARK: - Illustrations / parts
 
 /// 角丸タイルのピクセルカレンダー風プレビュー（非操作）。
-struct PixelPreviewIllustration: View {
+private struct PixelPreviewIllustration: View {
     let filledDays: Int
     let columns: Int
     let rows: Int

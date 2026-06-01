@@ -114,6 +114,7 @@ struct OnboardingFlow: View {
                     Task { await viewModel.handlePaywallDismissedWithoutPurchase() }
                 }
             )
+            .interactiveDismissDisabled()
         }
     }
 
