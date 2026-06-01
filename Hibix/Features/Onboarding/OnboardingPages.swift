@@ -184,9 +184,12 @@ struct OnboardingStartPage: View {
             title: "今日から始めよう",
             subtitle: "あなたに合った見守りモードを選択"
         ) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.hibixSubNavy)
+            Image("HibixIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96, height: 96)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .shadow(color: Color.hibixCardShadow, radius: 14, x: 0, y: 8)
         } extra: {
             VStack(spacing: 12) {
                 ForEach(WatchMode.allCases) { mode in
