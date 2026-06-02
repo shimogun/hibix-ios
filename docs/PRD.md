@@ -331,7 +331,7 @@ CREATE TABLE emergency_contacts (
     label TEXT,                               -- 表示名（例: 'お母さん'）NULL可
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    contact_type TEXT NOT NULL DEFAULT 'email' -- v2 migration: 'email' | 'line' | 'phone'
+    contact_type TEXT NOT NULL DEFAULT 'email' -- v2 migration. v1.0 で許容値は 'email' | 'line'（'phone' は廃止・カラムは後方互換のため維持、未知値は email にフォールバック）
 );
 ```
 
@@ -742,13 +742,12 @@ actor EntitlementManager {
 
 **緊急連絡先**:
 - 最大3件まで登録可
-- 連絡種別（`email` / `line` / `phone`）+ 連絡先の値（必須）+ 表示ラベル（任意・例「お母さん」）
+- 連絡種別（`email` / `line`）+ 連絡先の値（必須）+ 表示ラベル（任意・例「お母さん」）
 - 端末側ローカル DB に平文保存、サーバー側は AES-256-GCM 暗号化保存
-- **v0.1 では `email` のみ実送信**。`line` / `phone` は登録のみ受け付け、実送信は v0.2 で対応予定（UI 上で注記表示）
+- **v1.0 では `email` のみ実送信**。`phone`（電話）は廃止（v1.0 で UI・enum・バリデーションから完全撤去）。`line` は登録のみ受け付け、実送信は v1.1（Messaging API・公式アカウント方式）で対応予定（UI 上で注記表示）
 - 種別ごとのバリデーション:
   - `email`: 簡易 RFC 準拠（`@` 1個 + ドメイン部に英字2文字以上の TLD）
   - `line`: 空でなければ可（LINE ID または URL を許容）
-  - `phone`: 数字・ハイフン・スペース・括弧・`+` のみ、数字 5 桁以上
 
 **メール本文（固定・日本語）**:
 ```
@@ -1834,6 +1833,7 @@ Sprint 9: テスト + ベータ準備
 | v2.1.6 | 2026-05-16 | STEP6 着手前: §8.5 DELETE /api/account の論理削除実装方式を確定。旧版の「`last_checkin_at = NULL` で Cron 対象外化」ヒントが §4.2 NOT NULL 制約と矛盾していたため、「`deletion_requests` の未完了行存在チェック」方式に書き換え。同一 UUID の重複 DELETE 要求は冪等(既存の未完了 deletion_request を返却)。物理削除時の cascade 挙動と audit trail 保持(`completed_at` セット)を明文化。スキーマ・マイグレーション・他エンドポイント・iOS 側仕様は変更なし。 |
 | **v2.3.0** | **2026-05-24** | **気分入力体験リデザイン (D1+F1+F3): MoodLevel を 7段階→5段階に集約 (`sink(2)` → `down(1)` / `uplift(6)` → `good(5)`)。`mood_level` カラムの rawValue 域は 1-7 のまま維持し DB schema 変更なし、`MoodLevel.fromStoredValue` で旧データを decode。MoodPickerView に SF Symbol アイコン + 選択時 displayName ラベル + 長押し 0.5 秒で memo なし即記録 (F1) を追加。HomeView に保存後 flying replica + トースト overlay を追加 (F3)。F2 (気分別絵文字パレット) は実装後にオーナー判断で撤回 (長押し即保存で代替可能と判断)。実装計画: `docs/superpowers/plans/2026-05-24-hibix-mood-input-redesign.md`。サーバー側仕様・課金仕様・通知仕様は変更なし。** |
 | **v2.4.0** | **2026-05-26** | **F-07 緊急連絡先に種別 (`email` / `line` / `phone`) を追加。`emergency_contacts` テーブルに `contact_type TEXT NOT NULL DEFAULT 'email'` カラムを GRDB Migration v2 (`v2_emergency_contact_add_kind`) で追加し、既存 `email` カラムは連絡先の値として種別問わず流用 (後方互換確保)。`ContactType` enum (email/line/phone) を新設、UI に種別ホイールピッカー + 種別ごとの placeholder / keyboardType / バリデーション分岐を追加。`ContactInputBody` に `kind` フィールド追加。**v0.1 では `email` のみ実送信**、`line` / `phone` は登録のみで実送信は v0.2 で対応予定 (UI に注記表示)。サーバー側 Cron は `kind == 'email'` のレコードのみ送信、それ以外はスキップ。仕様メモ: `~/.company/secretary/notes/2026-05-26-hibix-f4-spec.md`。MoodLevel / 課金 / 通知タイマー仕様は変更なし。** |
+| **v2.5.0** | **2026-06-03** | **F-07 緊急連絡先: 電話通知 (`phone`) を廃止し、LINE 注記を v1.1 に更新 (オーナー承認 2026-06-03)。v1.0 では実送信は `email` のみ (変更なし)。`ContactType` enum から `.phone` case を完全撤去 (選択 UI / 入力フィールド / バリデーション / 関連テスト含む)。`line` は登録のみで残置し、coming soon 注記文言を「v0.2 で対応予定」→「v1.1 で対応予定」に更新 (実送信は引き続きしない)。LINE 本実装 (Messaging API・公式アカウント方式) は v1.1 へ先送り (LINE Notify が 2025/3 終了のため)。backend は変更不要: `contact_type` カラムは後方互換のため維持、`fromStoredValue` は未知値 (旧 `phone` レコード含む) を email にフォールバック。§F-07 / §4.1 / §15.3 を改訂。仕様メモ: `~/.company/secretary/notes/2026-06-03-hibix-emergency-contact-phone-removal-design.md`。MoodLevel / 課金 / 通知タイマー仕様は変更なし。** |
 | **v2.2.0** | **2026-05-17** | **STEP7 Codex設計レビューゲート対応: §2.2/§2.4 に App Attest(`DCAppAttestService`)/ StoreKit JWS サーバー検証 / `jose@5.9.6` 追加。§4.2 に `app_attest_keys` / `attest_challenges` / `storekit_transactions` 3テーブル新設、`notification_logs` に `contact_id`(M-05 per-contact retry)+ `retry_count` 追加、`idx_users_alert_target` 部分 index(M-02 Cron 絞り込み)を追加。§6 F-11 に削除取消権(48h以内)を追加。§8.1 を認証ヘッダ 4 種(App Attest)+ エラーコード一覧 + checkin atomic UPDATE(M-01)に書き換え。§8.3 から `is_pro` 受付削除(サーバー派生値化)。§8.4 contacts を `batch()` で原子化(M-04)。§8.5 に削除リクエスト中 409 `DELETION_PENDING`(M-03)。§8.6 Cron を SQL 集約 + per-contact retry に書き換え。§8.7-§8.10 新設(`/api/attest/{challenge,register}` / `/api/storekit/verify` / `/api/account/cancel-deletion`)。旧 §8.7 health は §8.11 にリナンバー。§10.3 に JWS / 公開鍵保存メモ追加。§10.7 新設(App Attest 検証フロー + 端末非対応フォールバック)。§13 Sprint 4/5 を C-01/C-02 込みに拡張。iOS 側仕様(GRDB / Keychain / 通知 UI / ピクセルカレンダー)は変更なし。本書** |
 
 ### 15.4 関連メモリ

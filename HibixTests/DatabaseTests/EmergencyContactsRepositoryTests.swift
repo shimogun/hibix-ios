@@ -40,27 +40,16 @@ struct EmergencyContactsRepositoryTests {
     }
 
     @Test
-    func add_persistsPhoneContact() async throws {
-        let (repo, _) = try makeRepository()
-        let contact = try await repo.add(contactType: .phone,
-                                         value: "090-1234-5678",
-                                         label: "父",
-                                         now: fixedNow)
-        #expect(contact.contactType == .phone)
-        #expect(contact.email == "090-1234-5678")
-    }
-
-    @Test
     func list_returnsContactsInSortOrder_withMixedTypes() async throws {
         let (repo, _) = try makeRepository()
         _ = try await repo.add(contactType: .email, value: "a@example.com", label: "A", now: fixedNow)
         _ = try await repo.add(contactType: .line, value: "@line_b", label: "B", now: fixedNow)
-        _ = try await repo.add(contactType: .phone, value: "08011112222", label: "C", now: fixedNow)
+        _ = try await repo.add(contactType: .email, value: "c@example.com", label: "C", now: fixedNow)
         let list = try await repo.list()
         #expect(list.count == 3)
         #expect(list[0].contactType == .email)
         #expect(list[1].contactType == .line)
-        #expect(list[2].contactType == .phone)
+        #expect(list[2].contactType == .email)
     }
 
     @Test

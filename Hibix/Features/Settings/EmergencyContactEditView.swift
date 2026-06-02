@@ -56,7 +56,7 @@ struct EmergencyContactEditView: View {
                 if !viewModel.contactType.isDeliveredInV01 {
                     Section {
                         Label {
-                            Text("\(viewModel.contactType.displayName) 種別は登録のみで、実際の通知送信は今後のアップデートで対応予定です。現在はメール宛のみ即時送信されます。")
+                            Text("\(viewModel.contactType.displayName) 種別は登録のみで、実際の通知送信は v1.1 で対応予定です。現在はメール宛のみ即時送信されます。")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         } icon: {
@@ -127,7 +127,6 @@ struct EmergencyContactEditView: View {
         switch type {
         case .email: return .emailAddress
         case .line:  return .default
-        case .phone: return .phonePad
         }
     }
 
@@ -135,7 +134,6 @@ struct EmergencyContactEditView: View {
         switch type {
         case .email: return .emailAddress
         case .line:  return nil
-        case .phone: return .telephoneNumber
         }
     }
 }

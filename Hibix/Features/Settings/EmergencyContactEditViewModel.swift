@@ -122,14 +122,8 @@ final class EmergencyContactEditViewModel {
             let pattern = #"^[^@\s]+@[^@\s.]+\.[A-Za-z]{2,}$"#
             return value.range(of: pattern, options: .regularExpression) != nil
         case .line:
-            // v0.1 は緩めのバリデーション (空でなければOK・トリム後 1 文字以上)
+            // v1.0 は緩めのバリデーション (空でなければOK・トリム後 1 文字以上)
             return true
-        case .phone:
-            // 数字・ハイフン・スペース・括弧・+ のみ許容、数字を 5 文字以上含む
-            let allowedPattern = #"^[0-9+\-\s()]+$"#
-            guard value.range(of: allowedPattern, options: .regularExpression) != nil else { return false }
-            let digitCount = value.filter(\.isNumber).count
-            return digitCount >= 5
         }
     }
 
@@ -137,7 +131,6 @@ final class EmergencyContactEditViewModel {
         switch type {
         case .email: return "メールアドレスの形式が正しくありません"
         case .line:  return "LINE ID または URL を入力してください"
-        case .phone: return "電話番号の形式が正しくありません"
         }
     }
 }
