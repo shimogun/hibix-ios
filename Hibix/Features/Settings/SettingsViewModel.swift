@@ -17,21 +17,17 @@ final class SettingsViewModel {
     }
 
     private(set) var watchMode: String = "solo"
-    private(set) var emergencyContactsCount: Int = 0
     private(set) var appLockEnabled: Bool = false
     private(set) var restoreState: RestoreState = .idle
 
     @ObservationIgnored private let settings: SettingsRepository
-    @ObservationIgnored private let contacts: EmergencyContactsRepository
     @ObservationIgnored private let entitlement: EntitlementManager
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Settings")
 
     init(settings: SettingsRepository,
-         contacts: EmergencyContactsRepository,
          entitlement: EntitlementManager) {
         self.settings = settings
-        self.contacts = contacts
         self.entitlement = entitlement
     }
 
@@ -41,7 +37,6 @@ final class SettingsViewModel {
                 watchMode = raw
             }
             appLockEnabled = try await settings.bool(forKey: .appLockEnabled)
-            emergencyContactsCount = try await contacts.count()
         } catch {
             Self.logger.error("Settings load failed: \(error.localizedDescription, privacy: .public)")
         }

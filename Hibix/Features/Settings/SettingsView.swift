@@ -13,7 +13,6 @@ struct SettingsView: View {
     init(dependencies: AppDependencies, onDismiss: @escaping () -> Void) {
         _viewModel = State(initialValue: SettingsViewModel(
             settings: dependencies.settingsRepository,
-            contacts: dependencies.emergencyContactsRepository,
             entitlement: dependencies.entitlementManager
         ))
         self.entitlement = dependencies.entitlementManager
@@ -110,16 +109,6 @@ struct SettingsView: View {
                     Text("見守りモード")
                     Spacer()
                     Text(displayWatchMode(viewModel.watchMode))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            NavigationLink {
-                EmergencyContactsView(dependencies: dependencies)
-            } label: {
-                HStack {
-                    Text("緊急連絡先")
-                    Spacer()
-                    Text("\(viewModel.emergencyContactsCount) 件")
                         .foregroundStyle(.secondary)
                 }
             }

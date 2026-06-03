@@ -10,7 +10,12 @@ import os.log
 @MainActor
 @Observable
 final class ModeSwitchViewModel {
+    /// 記録なし日数しきい値の許容範囲 (PRD v2.2.0 §6 F-06)。
+    static let watchDaysRange = 1...7
+    static let defaultWatchDays = 2
+
     private(set) var selectedMode: WatchMode = .solo
+    private(set) var watchDays: Int = ModeSwitchViewModel.defaultWatchDays
     var isPaywallPresented: Bool = false
 
     @ObservationIgnored private let settings: SettingsRepository
@@ -23,15 +28,40 @@ final class ModeSwitchViewModel {
         self.entitlement = entitlement
     }
 
+    /// `solo` は見守り通知が発生しないため、日数/緊急連絡先の設定は無効。
+    var canEditWatchSettings: Bool {
+        selectedMode != .solo
+    }
+
     func load() async {
         do {
             if let raw = try await settings.string(forKey: .watchMode),
                let mode = WatchMode(rawValue: raw) {
                 selectedMode = mode
             }
+            if let raw = try await settings.string(forKey: .watchDays),
+               let days = Int(raw) {
+                watchDays = Self.clampWatchDays(days)
+            }
         } catch {
-            Self.logger.error("Load watch_mode failed: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Load watch settings failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// 日数しきい値を 1...7 にクランプして保存。
+    func setWatchDays(_ days: Int) async {
+        let clamped = Self.clampWatchDays(days)
+        guard clamped != watchDays else { return }
+        watchDays = clamped
+        do {
+            try await settings.setString(String(clamped), forKey: .watchDays, now: Date())
+        } catch {
+            Self.logger.error("Persist watch_days failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private static func clampWatchDays(_ days: Int) -> Int {
+        min(max(days, watchDaysRange.lowerBound), watchDaysRange.upperBound)
     }
 
     /// 選択を試みる。無料 + 非 `solo` 選択 → Paywall 起動。保存は成功時のみ。
