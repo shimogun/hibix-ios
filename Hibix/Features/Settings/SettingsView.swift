@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
     @State private var isHelpPresented: Bool = false
     @Bindable private var entitlement: EntitlementManager
+    @Environment(\.openURL) private var openURL
     let onDismiss: () -> Void
 
     private let dependencies: AppDependencies
@@ -29,6 +30,7 @@ struct SettingsView: View {
                 watchSection
                 securitySection
                 purchaseSection
+                infoSection
                 dangerSection
             }
             .navigationTitle("設定")
@@ -148,6 +150,26 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
+        }
+    }
+
+    private var infoSection: some View {
+        Section("情報") {
+            Button {
+                if let url = URL(string: "https://shimogun.com/tokushoho") {
+                    openURL(url)
+                }
+            } label: {
+                HStack {
+                    Text("特定商取引法に基づく表記")
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityHint("外部ブラウザで特定商取引法に基づく表記を開きます")
         }
     }
 
