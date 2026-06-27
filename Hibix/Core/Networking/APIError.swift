@@ -5,6 +5,8 @@ enum APIErrorCode: String, Decodable, Sendable {
     case invalidUUID = "INVALID_UUID"
     case validationError = "VALIDATION_ERROR"
     case tooManyContacts = "TOO_MANY_CONTACTS"
+    /// v1.1 C案: 通知モード(gentle/daily)で email 型連絡先が0件のとき(M-01)。
+    case emailContactRequired = "EMAIL_CONTACT_REQUIRED"
     case rateLimitExceeded = "RATE_LIMIT_EXCEEDED"
     case deletionPending = "DELETION_PENDING"
     case attestationRequired = "ATTESTATION_REQUIRED"
