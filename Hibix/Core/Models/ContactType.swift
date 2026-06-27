@@ -35,11 +35,6 @@ enum ContactType: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// v1.0 で実送信されるかどうか。false の場合は UI 上で v1.1 注記を表示する。
-    var isDeliveredInV01: Bool {
-        self == .email
-    }
-
     /// DB に保存されている文字列から復元する。未知の値 (廃止した phone を含む) は email にフォールバック。
     static func fromStoredValue(_ raw: String?) -> ContactType {
         guard let raw, let value = ContactType(rawValue: raw) else { return .email }

@@ -2,8 +2,13 @@ import SwiftUI
 
 /// 緊急連絡先の追加/編集フォーム。新規・編集を共通化。
 struct EmergencyContactEditView: View {
+    /// LINE 連携シート提示用の Identifiable ラッパ（localContactID）。
+    private struct LineLinkTarget: Identifiable { let id: Int64 }
+
     @State private var viewModel: EmergencyContactEditViewModel
+    @State private var lineLinkTarget: LineLinkTarget?
     private let makePaywallViewModel: () -> PaywallViewModel
+    private let lineLinkService: LineLinkService
     let onSaved: () -> Void
     let onCancel: () -> Void
     let onDeleted: () -> Void
@@ -21,6 +26,7 @@ struct EmergencyContactEditView: View {
         ))
         let manager = dependencies.entitlementManager
         self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
+        self.lineLinkService = dependencies.lineLinkService
         self.onSaved = onSaved
         self.onCancel = onCancel
         self.onDeleted = onDeleted
@@ -54,17 +60,8 @@ struct EmergencyContactEditView: View {
                         .textInputAutocapitalization(.words)
                 }
 
-                if !viewModel.contactType.isDeliveredInV01 {
-                    Section {
-                        Label {
-                            Text("\(viewModel.contactType.displayName) 種別は登録のみで、実際の通知送信は v1.1 で対応予定です。現在はメール宛のみ即時送信されます。")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        } icon: {
-                            Image(systemName: "info.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                if viewModel.contactType == .line {
+                    lineLinkSection
                 }
 
                 if let message = viewModel.saveErrorMessage {
@@ -121,6 +118,39 @@ struct EmergencyContactEditView: View {
                     }
                 )
             }
+            .sheet(item: $lineLinkTarget, onDismiss: { onSaved() }) { target in
+                LineLinkView(viewModel: LineLinkViewModel(service: lineLinkService,
+                                                          localContactID: target.id))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var lineLinkSection: some View {
+        Section {
+            if let contact = viewModel.editingContact, contact.lineLinkStatus == .linked {
+                Label("連携済み", systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(.green)
+            } else {
+                if let contact = viewModel.editingContact, contact.lineLinkStatus == .pending {
+                    Label("連携待ち（コード送信待ち）", systemImage: "clock")
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    Task {
+                        if let localID = await viewModel.prepareLineLink() {
+                            lineLinkTarget = LineLinkTarget(id: localID)
+                        }
+                    }
+                } label: {
+                    Label("LINEで連携する", systemImage: "message.fill")
+                }
+                .disabled(viewModel.isSaving || !viewModel.isInputValid)
+            }
+        } header: {
+            Text("LINE連携")
+        } footer: {
+            Text("LINE で受け取るには連携が必要です。相手に友だち追加とコードの送信をお願いします。")
         }
     }
 
