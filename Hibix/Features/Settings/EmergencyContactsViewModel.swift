@@ -17,11 +17,13 @@ final class EmergencyContactsViewModel {
     var editingTarget: EditingTarget?
 
     @ObservationIgnored private let repo: EmergencyContactsRepository
+    @ObservationIgnored private let contactsSync: ContactsSyncService
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "EmergencyContacts")
 
-    init(repo: EmergencyContactsRepository) {
+    init(repo: EmergencyContactsRepository, contactsSync: ContactsSyncService) {
         self.repo = repo
+        self.contactsSync = contactsSync
     }
 
     var canAdd: Bool {
@@ -61,6 +63,7 @@ final class EmergencyContactsViewModel {
             }
         }
         await load()
+        await contactsSync.syncContacts()
     }
 
     enum EditingTarget: Identifiable, Equatable {

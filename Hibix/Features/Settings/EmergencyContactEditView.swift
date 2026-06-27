@@ -16,7 +16,8 @@ struct EmergencyContactEditView: View {
         _viewModel = State(initialValue: EmergencyContactEditViewModel(
             mode: mode,
             repo: dependencies.emergencyContactsRepository,
-            entitlement: dependencies.entitlementManager
+            entitlement: dependencies.entitlementManager,
+            contactsSync: dependencies.contactsSyncService
         ))
         let manager = dependencies.entitlementManager
         self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }

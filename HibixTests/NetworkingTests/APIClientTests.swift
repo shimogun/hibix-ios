@@ -16,7 +16,7 @@ struct APIClientTests {
     private func makeClient(handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)) -> (APIClient, URL) {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
-        StubURLProtocol.handler = handler
+        StubURLProtocol.setHandler(forUUID: "uuid-test", handler)
         let session = URLSession(configuration: config)
         let baseURL = Self.testBaseURL
         let client = APIClient(baseURL: baseURL, anonymousUUID: "uuid-test", session: session)
@@ -259,13 +259,27 @@ private func readHTTPBody(_ request: URLRequest) -> Data {
 // MARK: - URLProtocol stub
 
 final class StubURLProtocol: URLProtocol, @unchecked Sendable {
-    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (HTTPURLResponse, Data))?
+    /// `X-Hibix-UUID` ごとに handler を分離（並列実行される複数 Suite が衝突しないように）。
+    nonisolated(unsafe) private static var handlers: [String: @Sendable (URLRequest) -> (HTTPURLResponse, Data)] = [:]
+    private static let lock = NSLock()
+
+    static func setHandler(forUUID uuid: String, _ handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)) {
+        lock.lock(); defer { lock.unlock() }
+        handlers[uuid] = handler
+    }
+
+    static func handler(forUUID uuid: String?) -> (@Sendable (URLRequest) -> (HTTPURLResponse, Data))? {
+        lock.lock(); defer { lock.unlock() }
+        guard let uuid else { return nil }
+        return handlers[uuid]
+    }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        guard let handler = Self.handler else {
+        let uuid = request.value(forHTTPHeaderField: "X-Hibix-UUID")
+        guard let handler = Self.handler(forUUID: uuid) else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
             return
         }

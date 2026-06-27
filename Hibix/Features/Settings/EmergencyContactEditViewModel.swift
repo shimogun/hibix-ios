@@ -28,15 +28,18 @@ final class EmergencyContactEditViewModel {
     @ObservationIgnored private let mode: Mode
     @ObservationIgnored private let repo: EmergencyContactsRepository
     @ObservationIgnored private let entitlement: EntitlementManager
+    @ObservationIgnored private let contactsSync: ContactsSyncService
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "EmergencyContactEdit")
 
     init(mode: Mode,
          repo: EmergencyContactsRepository,
-         entitlement: EntitlementManager) {
+         entitlement: EntitlementManager,
+         contactsSync: ContactsSyncService) {
         self.mode = mode
         self.repo = repo
         self.entitlement = entitlement
+        self.contactsSync = contactsSync
         switch mode {
         case .new:
             self.contactType = .email
@@ -92,6 +95,7 @@ final class EmergencyContactEditViewModel {
                                       value: trimmedValue,
                                       label: label)
             }
+            await contactsSync.syncContacts()
             return true
         } catch {
             Self.logger.error("Save contact failed: \(error.localizedDescription, privacy: .public)")
@@ -107,6 +111,7 @@ final class EmergencyContactEditViewModel {
         defer { isSaving = false }
         do {
             try await repo.delete(id: contact.id)
+            await contactsSync.syncContacts()
             return true
         } catch {
             Self.logger.error("Delete contact failed: \(error.localizedDescription, privacy: .public)")

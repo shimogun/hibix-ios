@@ -17,7 +17,8 @@ struct ModeSwitchView: View {
             entitlement: dependencies.entitlementManager
         ))
         _contactsViewModel = State(initialValue: EmergencyContactsViewModel(
-            repo: dependencies.emergencyContactsRepository
+            repo: dependencies.emergencyContactsRepository,
+            contactsSync: dependencies.contactsSyncService
         ))
         self.entitlement = dependencies.entitlementManager
         self.dependencies = dependencies
