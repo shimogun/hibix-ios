@@ -56,9 +56,11 @@ struct EmergencyContactEditView: View {
                         .autocorrectionDisabled()
                 }
 
-                Section("ラベル (任意)") {
-                    TextField("例: お母さん", text: $bindable.label)
-                        .textInputAutocapitalization(.words)
+                if viewModel.contactType != .line {
+                    Section("ラベル (任意)") {
+                        TextField("例: お母さん", text: $bindable.label)
+                            .textInputAutocapitalization(.words)
+                    }
                 }
 
                 if viewModel.contactType == .line {

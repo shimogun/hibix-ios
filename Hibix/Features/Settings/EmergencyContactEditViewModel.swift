@@ -206,7 +206,7 @@ final class EmergencyContactEditViewModel {
     private static func invalidMessage(for type: ContactType) -> String {
         switch type {
         case .email: return "メールアドレスの形式が正しくありません"
-        case .line:  return "LINE ID または URL を入力してください"
+        case .line:  return "お名前（表示名）を入力してください"
         }
     }
 }
