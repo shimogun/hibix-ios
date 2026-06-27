@@ -41,7 +41,8 @@ struct ModeSwitchView: View {
         .navigationTitle("見守りモード")
         .navigationBarTitleDisplayMode(.inline)
         .alert("メールの緊急連絡先が必要です", isPresented: $bindable.requiresEmailContactAlert) {
-            Button("OK", role: .cancel) {}
+            Button("メール連絡先を追加") { contactsViewModel.presentAddSheet() }
+            Button("キャンセル", role: .cancel) {}
         } message: {
             Text("「ゆるつながり」「まいにち共有」を使うには、メールの緊急連絡先を1件以上登録してください。")
         }
@@ -159,9 +160,9 @@ struct ModeSwitchView: View {
             } header: {
                 Text("緊急連絡先")
             } footer: {
-                Text("最大 3 件まで登録できます。チェックインが途絶えたとき、登録した連絡先にお知らせが届きます。")
+                Text("最大 3 件まで登録できます。チェックインが途絶えたとき、登録した連絡先にお知らせが届きます。「ゆるつながり」「まいにち共有」にはメールの連絡先が最低1件必要です。")
             }
-            .disabled(!viewModel.canEditWatchSettings)
+            // モードに関わらず連絡先は管理可能（gentle/daily 切替の前提となるメール連絡先を solo 中に登録できるようにする）。
 
             if let message = contactsViewModel.lastErrorMessage {
                 Section {
