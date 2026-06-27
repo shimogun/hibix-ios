@@ -769,3 +769,4 @@ PRD v2.1 がこのプロジェクトに追加されたら、CC設計士は実装
 - 2026-05-15 v0.6(PRD v2.0 反映:MVP 16機能確定 / 技術スタック確定 / 認証=匿名UUID / 価格v0.1は¥2,800のみ)
 - 2026-05-15 v0.7(設計書反映漏れの修正: Cloudflare Workers + D1 復元 / Codex設計レビューゲート復元 / ピクセルカレンダー直近365日ローリングウィンドウ明記 / PRD v2.1 修正引き継ぎリスト新設)
 - **2026-05-17 v0.8(Codex設計レビュー反映: §5.2 入口認証を App Attest に確定 / StoreKit JWS サーバー検証導入 / Cloudflare 補強 / 削除リクエスト取り消し権を追記。詳細な実装仕様は PRD v2.2.0 を参照)**
+- **2026-06-27 v0.9(v1.1 LINE通知 C案: email/LINE 同列 iOS実装。連絡先は `email`/`line` の同列種別、通知モード(gentle/daily)では email 型が最低1件必須。LINE はコード送信方式(友だち追加→6桁コード→webhook 紐付け→push)、ユーザーは LINE ID を入力しない。iOS は contacts/settings をサーバー同期(従来は呼び出しゼロ)し、GRDB Migration v3 で `server_id`/`line_link_status` を保持。`ContactsSyncService`/`LineLinkService` を新設、編集画面に LINE 連携導線を統合し coming-soon を撤去、email≥1 を UI で先回り。backend は本番稼働済み(PR #5)。詳細実装仕様は PRD v2.6.0 / 設計 `docs/superpowers/specs/2026-06-27-v1.1-line-notification-design.md` を参照)**
