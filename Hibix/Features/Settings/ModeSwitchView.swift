@@ -70,6 +70,23 @@ struct ModeSwitchView: View {
                 }
             )
         }
+        .sheet(item: $contactsBindable.editingTarget) { target in
+            EmergencyContactEditView(
+                mode: target.editMode,
+                dependencies: dependencies,
+                onSaved: {
+                    contactsViewModel.dismissEditSheet()
+                    Task { await contactsViewModel.load() }
+                },
+                onCancel: {
+                    contactsViewModel.dismissEditSheet()
+                },
+                onDeleted: {
+                    contactsViewModel.dismissEditSheet()
+                    Task { await contactsViewModel.load() }
+                }
+            )
+        }
         .task {
             await viewModel.load()
             await contactsViewModel.load()
@@ -138,8 +155,7 @@ struct ModeSwitchView: View {
     // MARK: - 緊急連絡先
 
     private var contactsSection: some View {
-        @Bindable var contactsBindable = contactsViewModel
-        return Group {
+        Group {
             Section {
                 if contactsViewModel.contacts.isEmpty {
                     Text("登録されていません")
@@ -179,23 +195,6 @@ struct ModeSwitchView: View {
                         .foregroundStyle(.red)
                 }
             }
-        }
-        .sheet(item: $contactsBindable.editingTarget) { target in
-            EmergencyContactEditView(
-                mode: target.editMode,
-                dependencies: dependencies,
-                onSaved: {
-                    contactsViewModel.dismissEditSheet()
-                    Task { await contactsViewModel.load() }
-                },
-                onCancel: {
-                    contactsViewModel.dismissEditSheet()
-                },
-                onDeleted: {
-                    contactsViewModel.dismissEditSheet()
-                    Task { await contactsViewModel.load() }
-                }
-            )
         }
     }
 
