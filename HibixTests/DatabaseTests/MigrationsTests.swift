@@ -25,10 +25,36 @@ struct MigrationsTests {
             #expect(settingsColumns == ["key", "value", "updated_at"])
 
             let contactsColumns = Set(try db.columns(in: "emergency_contacts").map(\.name))
-            #expect(contactsColumns == ["id", "email", "label", "sort_order", "created_at", "contact_type"])
+            #expect(contactsColumns == ["id", "email", "label", "sort_order", "created_at",
+                                        "contact_type", "server_id", "line_link_status"])
 
             let indexNames = try db.indexes(on: "mood_entries").map(\.name)
             #expect(indexNames.contains("idx_mood_entries_date"))
+        }
+    }
+
+    @Test
+    func v3_addsServerIdAndLineStatusColumns() throws {
+        let dbQueue = try DatabaseQueue()
+        try Migrations.migrator.migrate(dbQueue)
+        try dbQueue.read { db in
+            let columns = Set(try db.columns(in: "emergency_contacts").map(\.name))
+            #expect(columns.contains("server_id"))
+            #expect(columns.contains("line_link_status"))
+        }
+    }
+
+    @Test
+    func v3_lineLinkStatusDefaultsToUnlinked() throws {
+        let dbQueue = try DatabaseQueue()
+        try Migrations.migrator.migrate(dbQueue)
+        try dbQueue.write { db in
+            try db.execute(sql: """
+                INSERT INTO emergency_contacts (email, label, sort_order, created_at, contact_type)
+                VALUES ('a@example.com', NULL, 0, '2026-01-01T00:00:00Z', 'email')
+                """)
+            let status = try String.fetchOne(db, sql: "SELECT line_link_status FROM emergency_contacts LIMIT 1")
+            #expect(status == "unlinked")
         }
     }
 

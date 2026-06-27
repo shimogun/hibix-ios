@@ -24,20 +24,16 @@ enum ContactType: String, CaseIterable, Codable, Sendable {
     var fieldLabel: String {
         switch self {
         case .email: return "メールアドレス"
-        case .line:  return "LINE ID または URL"
+        // v1.1 C案: LINE はコード送信方式で ID 入力不要。欄は表示名として使う（連携に必須）。
+        case .line:  return "お名前（必須）"
         }
     }
 
     var placeholder: String {
         switch self {
         case .email: return "example@email.com"
-        case .line:  return "@friend_id または https://line.me/..."
+        case .line:  return "例: お母さん"
         }
-    }
-
-    /// v1.0 で実送信されるかどうか。false の場合は UI 上で v1.1 注記を表示する。
-    var isDeliveredInV01: Bool {
-        self == .email
     }
 
     /// DB に保存されている文字列から復元する。未知の値 (廃止した phone を含む) は email にフォールバック。

@@ -9,6 +9,10 @@ struct EmergencyContact: Identifiable, Equatable, Sendable {
     var label: String?
     var sortOrder: Int
     var createdAt: Date
+    /// サーバー側 contact の UUID（PUT /api/contacts のレスポンスで確定）。未同期は nil。
+    var serverID: String?
+    /// LINE 連携状態のローカルキャッシュ（v1.1 C案）。
+    var lineLinkStatus: LineLinkStatus
 
     /// 一覧で表示するための見出し。label があれば優先、なければ contact value (email カラム流用)。
     var displayTitle: String {

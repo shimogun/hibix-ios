@@ -31,9 +31,9 @@ struct ContactTypeTests {
     }
 
     @Test
-    func isDeliveredInV01_onlyEmailIsTrue() {
-        #expect(ContactType.email.isDeliveredInV01 == true)
-        #expect(ContactType.line.isDeliveredInV01 == false)
+    func line_isSelectablePeerType() {
+        // v1.1 C案: line は email と同列の選択肢(coming-soon 撤去)。
+        #expect(ContactType.allCases.contains(.line))
     }
 
     @Test

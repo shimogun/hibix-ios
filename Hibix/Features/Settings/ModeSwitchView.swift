@@ -7,6 +7,8 @@ import SwiftUI
 struct ModeSwitchView: View {
     @State private var viewModel: ModeSwitchViewModel
     @State private var contactsViewModel: EmergencyContactsViewModel
+    /// 「メール連絡先が必要」アラートで追加を選んだ後、アラートが閉じきってからシートを出すための保留フラグ。
+    @State private var pendingEmailContactAdd = false
     @Bindable private var entitlement: EntitlementManager
     private let dependencies: AppDependencies
     private let makePaywallViewModel: () -> PaywallViewModel
@@ -14,10 +16,14 @@ struct ModeSwitchView: View {
     init(dependencies: AppDependencies) {
         _viewModel = State(initialValue: ModeSwitchViewModel(
             settings: dependencies.settingsRepository,
-            entitlement: dependencies.entitlementManager
+            entitlement: dependencies.entitlementManager,
+            contacts: dependencies.emergencyContactsRepository,
+            contactsSync: dependencies.contactsSyncService
         ))
         _contactsViewModel = State(initialValue: EmergencyContactsViewModel(
-            repo: dependencies.emergencyContactsRepository
+            repo: dependencies.emergencyContactsRepository,
+            contactsSync: dependencies.contactsSyncService,
+            settings: dependencies.settingsRepository
         ))
         self.entitlement = dependencies.entitlementManager
         self.dependencies = dependencies
@@ -27,6 +33,7 @@ struct ModeSwitchView: View {
 
     var body: some View {
         @Bindable var bindable = viewModel
+        @Bindable var contactsBindable = contactsViewModel
         List {
             modeSection
             selectedModeSection
@@ -35,6 +42,23 @@ struct ModeSwitchView: View {
         }
         .navigationTitle("見守りモード")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("メールの緊急連絡先が必要です", isPresented: $bindable.requiresEmailContactAlert) {
+            Button("メール連絡先を追加") { pendingEmailContactAdd = true }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("「ゆるつながり」「まいにち共有」を使うには、メールの緊急連絡先を1件以上登録してください。")
+        }
+        .onChange(of: viewModel.requiresEmailContactAlert) { _, isPresented in
+            // アラートが閉じきってからシートを提示（同時提示の競合で即閉じするのを防ぐ）。
+            guard !isPresented, pendingEmailContactAdd else { return }
+            pendingEmailContactAdd = false
+            Task { @MainActor in contactsViewModel.presentAddSheet() }
+        }
+        .alert("削除できません", isPresented: $contactsBindable.blockedByEmailRequirement) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("見守りモード中はメールの緊急連絡先が最低1件必要です。先に別のメール連絡先を追加してください。")
+        }
         .sheet(isPresented: $bindable.isPaywallPresented) {
             PaywallView(
                 viewModel: makePaywallViewModel(),
@@ -43,6 +67,23 @@ struct ModeSwitchView: View {
                 },
                 onDismiss: {
                     viewModel.isPaywallPresented = false
+                }
+            )
+        }
+        .sheet(item: $contactsBindable.editingTarget) { target in
+            EmergencyContactEditView(
+                mode: target.editMode,
+                dependencies: dependencies,
+                onSaved: {
+                    contactsViewModel.dismissEditSheet()
+                    Task { await contactsViewModel.load() }
+                },
+                onCancel: {
+                    contactsViewModel.dismissEditSheet()
+                },
+                onDeleted: {
+                    contactsViewModel.dismissEditSheet()
+                    Task { await contactsViewModel.load() }
                 }
             )
         }
@@ -114,8 +155,7 @@ struct ModeSwitchView: View {
     // MARK: - 緊急連絡先
 
     private var contactsSection: some View {
-        @Bindable var contactsBindable = contactsViewModel
-        return Group {
+        Group {
             Section {
                 if contactsViewModel.contacts.isEmpty {
                     Text("登録されていません")
@@ -144,9 +184,9 @@ struct ModeSwitchView: View {
             } header: {
                 Text("緊急連絡先")
             } footer: {
-                Text("最大 3 件まで登録できます。チェックインが途絶えたとき、登録した連絡先にお知らせが届きます。")
+                Text("最大 3 件まで登録できます。チェックインが途絶えたとき、登録した連絡先にお知らせが届きます。「ゆるつながり」「まいにち共有」にはメールの連絡先が最低1件必要です。")
             }
-            .disabled(!viewModel.canEditWatchSettings)
+            // モードに関わらず連絡先は管理可能（gentle/daily 切替の前提となるメール連絡先を solo 中に登録できるようにする）。
 
             if let message = contactsViewModel.lastErrorMessage {
                 Section {
@@ -155,23 +195,6 @@ struct ModeSwitchView: View {
                         .foregroundStyle(.red)
                 }
             }
-        }
-        .sheet(item: $contactsBindable.editingTarget) { target in
-            EmergencyContactEditView(
-                mode: target.editMode,
-                dependencies: dependencies,
-                onSaved: {
-                    contactsViewModel.dismissEditSheet()
-                    Task { await contactsViewModel.load() }
-                },
-                onCancel: {
-                    contactsViewModel.dismissEditSheet()
-                },
-                onDeleted: {
-                    contactsViewModel.dismissEditSheet()
-                    Task { await contactsViewModel.load() }
-                }
-            )
         }
     }
 

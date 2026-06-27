@@ -20,6 +20,8 @@ final class AppDependencies {
     let apiClient: APIClient
     let appAttestClient: AppAttestClient
     let checkinService: CheckinService
+    let contactsSyncService: ContactsSyncService
+    let lineLinkService: LineLinkService
     let entitlementManager: EntitlementManager
     let storeKitVerifyService: StoreKitVerifyService
     let appLockManager: AppLockManager
@@ -88,6 +90,21 @@ final class AppDependencies {
             deletionPending: pendingCoordinator
         )
 
+        let contactsSync = ContactsSyncService(
+            apiClient: apiClient,
+            contactsRepo: self.emergencyContactsRepository,
+            settings: settings,
+            attest: attestClient,
+            deletionPending: pendingCoordinator
+        )
+        self.contactsSyncService = contactsSync
+
+        self.lineLinkService = LineLinkService(
+            apiClient: apiClient,
+            contactsRepo: self.emergencyContactsRepository,
+            contactsSync: contactsSync
+        )
+
         let verifyService = StoreKitVerifyService(
             apiClient: apiClient,
             attest: attestClient,
@@ -145,6 +162,7 @@ final class AppDependencies {
         let registered = await appAttestClient.ensureRegistered()
         if registered {
             await checkinService.resyncPendingCheckins()
+            await contactsSyncService.resyncOnLaunch()
         } else {
             Self.logger.notice("App Attest unavailable; running in read-only mode")
         }

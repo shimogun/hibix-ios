@@ -42,6 +42,18 @@ enum Migrations {
                 """)
         }
 
+        // v1.1 LINE通知(C案): サーバー contact UUID と LINE 連携状態をローカル保持。
+        migrator.registerMigration("v3_emergency_contacts_add_line_sync") { db in
+            try db.execute(sql: """
+                ALTER TABLE emergency_contacts
+                ADD COLUMN server_id TEXT
+                """)
+            try db.execute(sql: """
+                ALTER TABLE emergency_contacts
+                ADD COLUMN line_link_status TEXT NOT NULL DEFAULT 'unlinked'
+                """)
+        }
+
         return migrator
     }
 }

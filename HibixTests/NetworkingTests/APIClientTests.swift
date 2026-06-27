@@ -16,7 +16,7 @@ struct APIClientTests {
     private func makeClient(handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)) -> (APIClient, URL) {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
-        StubURLProtocol.handler = handler
+        StubURLProtocol.setHandler(forUUID: "uuid-test", handler)
         let session = URLSession(configuration: config)
         let baseURL = Self.testBaseURL
         let client = APIClient(baseURL: baseURL, anonymousUUID: "uuid-test", session: session)
@@ -144,18 +144,142 @@ struct APIClientTests {
 
         try store.reset()
     }
+
+    // MARK: - v1.1 contacts / LINE
+
+    private func makeRegisteredAttest() throws -> AppAttestClient {
+        let store = AppAttestKeyStore(service: UUID().uuidString)
+        try store.saveKeyId("test-key-id")
+        try store.setRegistered(true)
+        return AppAttestClient(
+            service: FakeAppAttestService(),
+            store: store,
+            fetchChallenge: { @Sendable in
+                AttestChallengeResponse(challenge: "Y2hhbGxlbmdl", expires_at: Date().addingTimeInterval(300))
+            },
+            register: { @Sendable _, _ in }
+        )
+    }
+
+    @Test
+    func contacts_encodesPeerModelBody_andDecodesResponse() async throws {
+        var capturedContacts: [[String: Any]] = []
+        var capturedMethod: String?
+        let (client, _) = makeClient { request in
+            capturedMethod = request.httpMethod
+            let bodyData = readHTTPBody(request)
+            if let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+               let contacts = json["contacts"] as? [[String: Any]] {
+                capturedContacts = contacts
+            }
+            let resp = #"{"contacts":[{"id":"uuid-a","contact_type":"email","label":null},{"id":"uuid-b","contact_type":"line","label":"兄"}]}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(resp.utf8))
+        }
+        client.attach(attestClient: try makeRegisteredAttest())
+
+        let body = ContactsPutBody(contacts: [
+            ContactInputBody(id: nil, contact_type: "email", email: "a@example.com", label: nil),
+            ContactInputBody(id: "uuid-b", contact_type: "line", email: nil, label: "兄"),
+        ])
+        let resp: ContactsResponse = try await client.request(.contacts(body))
+
+        #expect(capturedMethod == "PUT")
+        #expect(resp.contacts.count == 2)
+        #expect(resp.contacts[0].id == "uuid-a")
+        #expect(resp.contacts[1].contact_type == "line")
+        #expect(capturedContacts.count == 2)
+        #expect(capturedContacts[0]["contact_type"] as? String == "email")
+        #expect(capturedContacts[0]["email"] as? String == "a@example.com")
+        #expect(capturedContacts[0]["id"] == nil)                 // 新規は id キー無し
+        #expect(capturedContacts[1]["id"] as? String == "uuid-b") // 既存は id 付き
+        #expect(capturedContacts[1]["email"] == nil)              // line 型は email キー無し
+    }
+
+    @Test
+    func lineIssueCode_postsToContactPath_andDecodesEpoch() async throws {
+        var capturedURL: URL?
+        var capturedMethod: String?
+        let (client, base) = makeClient { request in
+            capturedURL = request.url
+            capturedMethod = request.httpMethod
+            let resp = #"{"code":"A2B3C4","expires_at":1781234567,"add_friend_url":"https://line.me/R/ti/p/@hibix"}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(resp.utf8))
+        }
+        client.attach(attestClient: try makeRegisteredAttest())
+
+        let resp: LineIssueCodeResponse = try await client.request(.lineIssueCode(serverContactID: "uuid-b"))
+        #expect(resp.code == "A2B3C4")
+        #expect(resp.expires_at == 1_781_234_567)
+        #expect(resp.add_friend_url == "https://line.me/R/ti/p/@hibix")
+        #expect(capturedMethod == "POST")
+        #expect(capturedURL == base.appendingPathComponent("/api/contacts/uuid-b/line/issue-code"))
+    }
+
+    @Test
+    func lineStatus_getsStatus_andNullableExpiry() async throws {
+        var capturedURL: URL?
+        var capturedMethod: String?
+        let (client, base) = makeClient { request in
+            capturedURL = request.url
+            capturedMethod = request.httpMethod
+            let resp = #"{"status":"linked","code_expires_at":null}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(resp.utf8))
+        }
+        client.attach(attestClient: try makeRegisteredAttest())
+
+        let resp: LineStatusResponse = try await client.request(.lineStatus(serverContactID: "uuid-b"))
+        #expect(resp.status == "linked")
+        #expect(resp.code_expires_at == nil)
+        #expect(capturedMethod == "GET")
+        #expect(capturedURL == base.appendingPathComponent("/api/contacts/uuid-b/line/status"))
+    }
+}
+
+/// URLProtocol 経由のリクエストは body が `httpBodyStream` に入るため、ストリームから読み出す。
+private func readHTTPBody(_ request: URLRequest) -> Data {
+    if let body = request.httpBody { return body }
+    guard let stream = request.httpBodyStream else { return Data() }
+    stream.open()
+    defer { stream.close() }
+    var data = Data()
+    let bufferSize = 4096
+    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+    defer { buffer.deallocate() }
+    while stream.hasBytesAvailable {
+        let read = stream.read(buffer, maxLength: bufferSize)
+        if read <= 0 { break }
+        data.append(buffer, count: read)
+    }
+    return data
 }
 
 // MARK: - URLProtocol stub
 
 final class StubURLProtocol: URLProtocol, @unchecked Sendable {
-    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (HTTPURLResponse, Data))?
+    /// `X-Hibix-UUID` ごとに handler を分離（並列実行される複数 Suite が衝突しないように）。
+    nonisolated(unsafe) private static var handlers: [String: @Sendable (URLRequest) -> (HTTPURLResponse, Data)] = [:]
+    private static let lock = NSLock()
+
+    static func setHandler(forUUID uuid: String, _ handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)) {
+        lock.lock(); defer { lock.unlock() }
+        handlers[uuid] = handler
+    }
+
+    static func handler(forUUID uuid: String?) -> (@Sendable (URLRequest) -> (HTTPURLResponse, Data))? {
+        lock.lock(); defer { lock.unlock() }
+        guard let uuid else { return nil }
+        return handlers[uuid]
+    }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        guard let handler = Self.handler else {
+        let uuid = request.value(forHTTPHeaderField: "X-Hibix-UUID")
+        guard let handler = Self.handler(forUUID: uuid) else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
             return
         }
