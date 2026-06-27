@@ -86,4 +86,51 @@ struct EmergencyContactsRepositoryTests {
         #expect(list.first?.email == "@new_line")
         #expect(list.first?.label == "切替後")
     }
+
+    @Test
+    func add_defaultsServerIdNilAndStatusUnlinked() async throws {
+        let (repo, _) = try makeRepository()
+        let c = try await repo.add(contactType: .line, value: "兄", label: "兄", now: fixedNow)
+        #expect(c.serverID == nil)
+        #expect(c.lineLinkStatus == .unlinked)
+    }
+
+    @Test
+    func updateServerMapping_persistsServerId() async throws {
+        let (repo, _) = try makeRepository()
+        let a = try await repo.add(contactType: .email, value: "a@example.com", label: nil, now: fixedNow)
+        try await repo.updateServerMapping([(localID: a.id, serverID: "uuid-a")])
+        let listed = try await repo.list()
+        #expect(listed.first(where: { $0.id == a.id })?.serverID == "uuid-a")
+    }
+
+    @Test
+    func updateLineLinkStatus_persists() async throws {
+        let (repo, _) = try makeRepository()
+        let a = try await repo.add(contactType: .line, value: "兄", label: nil, now: fixedNow)
+        try await repo.updateLineLinkStatus(localID: a.id, status: .linked)
+        let listed = try await repo.list()
+        #expect(listed.first(where: { $0.id == a.id })?.lineLinkStatus == .linked)
+    }
+
+    @Test
+    func update_keepsServerIdAndResetsStatusOnTypeChange() async throws {
+        let (repo, _) = try makeRepository()
+        let a = try await repo.add(contactType: .line, value: "兄", label: nil, now: fixedNow)
+        try await repo.updateServerMapping([(localID: a.id, serverID: "uuid-a")])
+        try await repo.updateLineLinkStatus(localID: a.id, status: .linked)
+        try await repo.update(id: a.id, contactType: .email, value: "a@example.com", label: nil)
+        let c = try await repo.list().first(where: { $0.id == a.id })
+        #expect(c?.serverID == "uuid-a")          // server_id は保持
+        #expect(c?.lineLinkStatus == .unlinked)   // 種別変更で status リセット
+    }
+
+    @Test
+    func update_sameType_keepsLineLinkStatus() async throws {
+        let (repo, _) = try makeRepository()
+        let a = try await repo.add(contactType: .line, value: "兄", label: nil, now: fixedNow)
+        try await repo.updateLineLinkStatus(localID: a.id, status: .linked)
+        try await repo.update(id: a.id, contactType: .line, value: "兄(改)", label: "兄")
+        #expect(try await repo.list().first(where: { $0.id == a.id })?.lineLinkStatus == .linked)
+    }
 }
