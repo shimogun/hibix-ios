@@ -14,6 +14,10 @@ enum APIEndpoint {
     case storekitVerify(StoreKitVerifyBody)
     case cancelDeletion
     case health
+    /// POST /api/contacts/:id/line/issue-code (v1.1 C案・App Attest 必須)。
+    case lineIssueCode(serverContactID: String)
+    /// GET /api/contacts/:id/line/status (v1.1 C案・App Attest 必須)。
+    case lineStatus(serverContactID: String)
 
     var path: String {
         switch self {
@@ -26,12 +30,14 @@ enum APIEndpoint {
         case .storekitVerify: return "/api/storekit/verify"
         case .cancelDeletion: return "/api/account/cancel-deletion"
         case .health: return "/api/health"
+        case .lineIssueCode(let id): return "/api/contacts/\(id)/line/issue-code"
+        case .lineStatus(let id): return "/api/contacts/\(id)/line/status"
         }
     }
 
     var method: String {
         switch self {
-        case .checkin, .attestChallenge, .attestRegister, .storekitVerify, .cancelDeletion:
+        case .checkin, .attestChallenge, .attestRegister, .storekitVerify, .cancelDeletion, .lineIssueCode:
             return "POST"
         case .settings:
             return "PATCH"
@@ -39,14 +45,16 @@ enum APIEndpoint {
             return "PUT"
         case .account:
             return "DELETE"
-        case .health:
+        case .health, .lineStatus:
             return "GET"
         }
     }
 
     var requiresAttest: Bool {
         switch self {
-        case .checkin, .settings, .contacts, .account, .storekitVerify, .cancelDeletion:
+        case .checkin, .settings, .contacts, .account, .storekitVerify, .cancelDeletion,
+             .lineIssueCode, .lineStatus:
+            // LINE 系も backend で authMiddleware + attestMiddleware + deletionGuard 配下。
             return true
         case .attestChallenge, .attestRegister, .health:
             return false
@@ -79,7 +87,7 @@ enum APIEndpoint {
             return try encoder.encode(body)
         case .storekitVerify(let body):
             return try encoder.encode(body)
-        case .account, .attestChallenge, .cancelDeletion, .health:
+        case .account, .attestChallenge, .cancelDeletion, .health, .lineIssueCode, .lineStatus:
             return nil
         }
     }
@@ -96,11 +104,27 @@ nonisolated struct SettingsPatchBody: Encodable {
     let watch_mode: String?
 }
 
+/// PUT /api/contacts の1要素 (v1.1 C案: email/LINE 同列・安定ID upsert)。
+/// - `id`: サーバー contact UUID。省略(nil)=新規。JSON では nil 時にキーを出さない。
+/// - `email`: email 型のみ。line 型は nil(キーを出さない)。
 nonisolated struct ContactInputBody: Encodable {
-    let email: String
+    let id: String?
+    let contact_type: String
+    let email: String?
     let label: String?
-    /// 連絡種別 (F-07 v0.2)。"email"/"line"/"phone"。サーバー側で送信ロジックを分岐する。
-    let kind: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, contact_type, email, label
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(id, forKey: .id)
+        try container.encode(contact_type, forKey: .contact_type)
+        try container.encodeIfPresent(email, forKey: .email)
+        // label は null 許容(明示 null を送る)。
+        try container.encode(label, forKey: .label)
+    }
 }
 
 nonisolated struct ContactsPutBody: Encodable {
@@ -135,6 +159,7 @@ nonisolated struct ContactsResponse: Decodable {
 
 nonisolated struct ContactOutput: Decodable {
     let id: String
+    let contact_type: String
     let label: String?
 }
 
@@ -165,4 +190,19 @@ nonisolated struct CancelDeletionResponse: Decodable {
 
 nonisolated struct HealthResponse: Decodable {
     let status: String
+}
+
+// MARK: - LINE 連携(v1.1 C案)
+// 注意: expires_at / code_expires_at は UNIX epoch 秒(Int)。
+// 他APIの ISO8601 Date と異なるため Int で受けて TimeInterval へ変換する。
+
+nonisolated struct LineIssueCodeResponse: Decodable {
+    let code: String
+    let expires_at: Int
+    let add_friend_url: String?
+}
+
+nonisolated struct LineStatusResponse: Decodable {
+    let status: String
+    let code_expires_at: Int?
 }
