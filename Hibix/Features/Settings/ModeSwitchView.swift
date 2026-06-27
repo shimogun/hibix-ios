@@ -7,6 +7,8 @@ import SwiftUI
 struct ModeSwitchView: View {
     @State private var viewModel: ModeSwitchViewModel
     @State private var contactsViewModel: EmergencyContactsViewModel
+    /// 「メール連絡先が必要」アラートで追加を選んだ後、アラートが閉じきってからシートを出すための保留フラグ。
+    @State private var pendingEmailContactAdd = false
     @Bindable private var entitlement: EntitlementManager
     private let dependencies: AppDependencies
     private let makePaywallViewModel: () -> PaywallViewModel
@@ -41,10 +43,16 @@ struct ModeSwitchView: View {
         .navigationTitle("見守りモード")
         .navigationBarTitleDisplayMode(.inline)
         .alert("メールの緊急連絡先が必要です", isPresented: $bindable.requiresEmailContactAlert) {
-            Button("メール連絡先を追加") { contactsViewModel.presentAddSheet() }
+            Button("メール連絡先を追加") { pendingEmailContactAdd = true }
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("「ゆるつながり」「まいにち共有」を使うには、メールの緊急連絡先を1件以上登録してください。")
+        }
+        .onChange(of: viewModel.requiresEmailContactAlert) { _, isPresented in
+            // アラートが閉じきってからシートを提示（同時提示の競合で即閉じするのを防ぐ）。
+            guard !isPresented, pendingEmailContactAdd else { return }
+            pendingEmailContactAdd = false
+            Task { @MainActor in contactsViewModel.presentAddSheet() }
         }
         .alert("削除できません", isPresented: $contactsBindable.blockedByEmailRequirement) {
             Button("OK", role: .cancel) {}
