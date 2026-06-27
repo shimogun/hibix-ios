@@ -24,8 +24,8 @@ enum ContactType: String, CaseIterable, Codable, Sendable {
     var fieldLabel: String {
         switch self {
         case .email: return "メールアドレス"
-        // v1.1 C案: LINE はコード送信方式で ID 入力不要。欄は表示名として使う。
-        case .line:  return "お名前（表示名）"
+        // v1.1 C案: LINE はコード送信方式で ID 入力不要。欄は表示名として使う（連携に必須）。
+        case .line:  return "お名前（必須）"
         }
     }
 
