@@ -21,6 +21,7 @@ final class AppDependencies {
     let appAttestClient: AppAttestClient
     let checkinService: CheckinService
     let contactsSyncService: ContactsSyncService
+    let lineLinkService: LineLinkService
     let entitlementManager: EntitlementManager
     let storeKitVerifyService: StoreKitVerifyService
     let appLockManager: AppLockManager
@@ -89,12 +90,19 @@ final class AppDependencies {
             deletionPending: pendingCoordinator
         )
 
-        self.contactsSyncService = ContactsSyncService(
+        let contactsSync = ContactsSyncService(
             apiClient: apiClient,
             contactsRepo: self.emergencyContactsRepository,
             settings: settings,
             attest: attestClient,
             deletionPending: pendingCoordinator
+        )
+        self.contactsSyncService = contactsSync
+
+        self.lineLinkService = LineLinkService(
+            apiClient: apiClient,
+            contactsRepo: self.emergencyContactsRepository,
+            contactsSync: contactsSync
         )
 
         let verifyService = StoreKitVerifyService(
