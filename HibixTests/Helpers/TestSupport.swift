@@ -19,6 +19,21 @@ enum TestSupport {
         )
     }
 
+    /// 未登録の AppAttestClient（isSupported=true / isRegistered=false）。
+    /// これを使うと ContactsSyncService の sync 系は read-only スキップになる。
+    @MainActor
+    static func makeUnregisteredAttestClient() throws -> AppAttestClient {
+        let store = AppAttestKeyStore(service: UUID().uuidString)
+        return AppAttestClient(
+            service: FakeAppAttestService(),
+            store: store,
+            fetchChallenge: { @Sendable in
+                AttestChallengeResponse(challenge: "Y2hhbGxlbmdl", expires_at: Date().addingTimeInterval(300))
+            },
+            register: { @Sendable _, _ in }
+        )
+    }
+
     @MainActor
     static func makeStubAPIClient(
         handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data)

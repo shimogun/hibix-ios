@@ -29,17 +29,20 @@ final class EmergencyContactEditViewModel {
     @ObservationIgnored private let repo: EmergencyContactsRepository
     @ObservationIgnored private let entitlement: EntitlementManager
     @ObservationIgnored private let contactsSync: ContactsSyncService
+    @ObservationIgnored private let settings: SettingsRepository
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "EmergencyContactEdit")
 
     init(mode: Mode,
          repo: EmergencyContactsRepository,
          entitlement: EntitlementManager,
-         contactsSync: ContactsSyncService) {
+         contactsSync: ContactsSyncService,
+         settings: SettingsRepository) {
         self.mode = mode
         self.repo = repo
         self.entitlement = entitlement
         self.contactsSync = contactsSync
+        self.settings = settings
         switch mode {
         case .new:
             self.contactType = .email
@@ -83,6 +86,13 @@ final class EmergencyContactEditViewModel {
         }
         if !entitlement.isPro {
             isPaywallPresented = true
+            return false
+        }
+        // 種別を email から別種別へ変える操作で、見守りモード中に email を0件にするのはブロック。
+        if case .existing(let contact) = mode,
+           contact.contactType == .email, contactType != .email,
+           await removingEmailWouldViolate() {
+            saveErrorMessage = Self.emailRequiredMessage
             return false
         }
         isSaving = true
@@ -152,6 +162,11 @@ final class EmergencyContactEditViewModel {
     /// 削除(編集モードのみ)。
     func delete() async -> Bool {
         guard case .existing(let contact) = mode else { return false }
+        // 見守りモード中に最後の email 連絡先を削除するのはブロック（サーバー M-01 先回り）。
+        if contact.contactType == .email, await removingEmailWouldViolate() {
+            saveErrorMessage = Self.emailRequiredMessage
+            return false
+        }
         isSaving = true
         defer { isSaving = false }
         do {
@@ -163,6 +178,17 @@ final class EmergencyContactEditViewModel {
             saveErrorMessage = "削除に失敗しました"
             return false
         }
+    }
+
+    static let emailRequiredMessage =
+        "見守りモード中はメールの緊急連絡先が最低1件必要です。先に別のメール連絡先を追加してください。"
+
+    /// gentle/daily 中に email を1件失う操作が email を0件にするか（true ならブロック）。
+    private func removingEmailWouldViolate() async -> Bool {
+        let notifying = WatchMode.isNotifyingRawValue(try? await settings.string(forKey: .watchMode))
+        guard notifying else { return false }
+        let emailCount = (try? await repo.list())?.filter { $0.contactType == .email }.count ?? 0
+        return emailCount <= 1
     }
 
     nonisolated static func isValid(contactType: ContactType, value: String) -> Bool {

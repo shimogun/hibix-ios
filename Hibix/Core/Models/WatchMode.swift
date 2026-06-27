@@ -32,4 +32,16 @@ enum WatchMode: String, CaseIterable, Sendable, Identifiable {
     var requiresPro: Bool {
         self != .solo
     }
+
+    /// 緊急連絡先への通知が発生するモードか(gentle/daily)。
+    /// このモードでは email 型連絡先が最低1件必要(サーバー M-01・v1.1 C案)。
+    var isNotifying: Bool {
+        self != .solo
+    }
+
+    /// DB 保存値が gentle/daily か（先回りバリデーション用）。
+    static func isNotifyingRawValue(_ raw: String?) -> Bool {
+        guard let raw, let mode = WatchMode(rawValue: raw) else { return false }
+        return mode.isNotifying
+    }
 }

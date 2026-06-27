@@ -14,11 +14,14 @@ struct ModeSwitchView: View {
     init(dependencies: AppDependencies) {
         _viewModel = State(initialValue: ModeSwitchViewModel(
             settings: dependencies.settingsRepository,
-            entitlement: dependencies.entitlementManager
+            entitlement: dependencies.entitlementManager,
+            contacts: dependencies.emergencyContactsRepository,
+            contactsSync: dependencies.contactsSyncService
         ))
         _contactsViewModel = State(initialValue: EmergencyContactsViewModel(
             repo: dependencies.emergencyContactsRepository,
-            contactsSync: dependencies.contactsSyncService
+            contactsSync: dependencies.contactsSyncService,
+            settings: dependencies.settingsRepository
         ))
         self.entitlement = dependencies.entitlementManager
         self.dependencies = dependencies
@@ -28,6 +31,7 @@ struct ModeSwitchView: View {
 
     var body: some View {
         @Bindable var bindable = viewModel
+        @Bindable var contactsBindable = contactsViewModel
         List {
             modeSection
             selectedModeSection
@@ -36,6 +40,16 @@ struct ModeSwitchView: View {
         }
         .navigationTitle("見守りモード")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("メールの緊急連絡先が必要です", isPresented: $bindable.requiresEmailContactAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("「ゆるつながり」「まいにち共有」を使うには、メールの緊急連絡先を1件以上登録してください。")
+        }
+        .alert("削除できません", isPresented: $contactsBindable.blockedByEmailRequirement) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("見守りモード中はメールの緊急連絡先が最低1件必要です。先に別のメール連絡先を追加してください。")
+        }
         .sheet(isPresented: $bindable.isPaywallPresented) {
             PaywallView(
                 viewModel: makePaywallViewModel(),
