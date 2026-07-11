@@ -522,13 +522,23 @@ actor EntitlementManager {
 
 ### 5.3 StoreKit 2 商品仕様
 
+**v1.1 でハイブリッド課金に刷新**（オーナー承認 2026-07-11・§15.3 v2.7.0）。設計: `~/.company/aso-consulting/2026-07-11-hibix-subscription-implementation-spec.md`。
+
 | 商品ID | 種類 | 価格 | 用途 |
 |---|---|---|---|
-| `com.shimogun.hibix.pro.lifetime` | Non-Consumable | ¥2,800 | 買い切りPro |
+| `com.shimogun.hibix.pro.monthly` | Auto-Renewable Subscription | ¥480/月（7日間無料トライアル） | サブスクPro（主役） |
+| `com.shimogun.hibix.pro.lifetime` | Non-Consumable | ¥5,800 | 買い切りPro（第2・現¥2,800から改定） |
+
+- `isPro = 有効なサブスク（トライアル中含む） OR lifetime所有`。エンタイトルメント判定対象は両商品ID（`StoreKitProduct.allIDs`）。
+- サブスクは 1 サブスクグループ「Hibix Pro」に属する（将来の年額・階層はこのグループに追加）。
+- **サーバー側 `is_pro` はサブスクの有効期限・失効に追従する必要がある**（見守り cron が `is_pro` 依存のため）。backend の `/api/storekit/verify` 拡張＋ App Store Server Notifications V2 受信で担保（hibix-backend 側タスク）。
 
 **App Store Connect 設定**:
-- 価格層: Tier 18（¥2,800 / $19.99 / EUR 19,99）
-- ローカリゼーション: 日本語のみ
+- サブスク: 月額 ¥480 相当の価格 Tier、イントロオファー = 7日間無料（新規のみ）。
+- lifetime: 価格 Tier を ¥5,800 に改定。
+- **サブスク規約(EULA)＋プライバシーポリシーURL**・自動更新の法定文言（審査必須・3.1.2）。
+- **App Store Server Notifications V2 の URL 登録**（本番/サンドボックス）。
+- ローカリゼーション: 日本語。
 
 ### 5.4 購入状態の取得・キャッシュ
 
@@ -1790,7 +1800,7 @@ Sprint 9: テスト + ベータ準備
 - ❌ 双方向見守り（両者アプリ持ち・お互いの気分共有）
 - ❌ iCloud 経由のフルデータ同期
 - ❌ AI 洞察・ChatGPT 統合
-- ❌ サブスクリプション商品（月額/年額）
+- ~~❌ サブスクリプション商品（月額/年額）~~ → **v1.1 で月額サブスク `pro.monthly`（7日無料→¥480/月）を導入（オーナー承認 2026-07-11・§5.3 / §15.3 v2.7.0）。年額は当面なし。**
 - ❌ ペアプラン・ファミリープラン
 - ❌ テーマ・カラーパック追加
 - ❌ ソーシャル機能（フォロー・コメント・公開タイムライン）
@@ -1839,6 +1849,7 @@ Sprint 9: テスト + ベータ準備
 | **v2.4.0** | **2026-05-26** | **F-07 緊急連絡先に種別 (`email` / `line` / `phone`) を追加。`emergency_contacts` テーブルに `contact_type TEXT NOT NULL DEFAULT 'email'` カラムを GRDB Migration v2 (`v2_emergency_contact_add_kind`) で追加し、既存 `email` カラムは連絡先の値として種別問わず流用 (後方互換確保)。`ContactType` enum (email/line/phone) を新設、UI に種別ホイールピッカー + 種別ごとの placeholder / keyboardType / バリデーション分岐を追加。`ContactInputBody` に `kind` フィールド追加。**v0.1 では `email` のみ実送信**、`line` / `phone` は登録のみで実送信は v0.2 で対応予定 (UI に注記表示)。サーバー側 Cron は `kind == 'email'` のレコードのみ送信、それ以外はスキップ。仕様メモ: `~/.company/secretary/notes/2026-05-26-hibix-f4-spec.md`。MoodLevel / 課金 / 通知タイマー仕様は変更なし。** |
 | **v2.5.0** | **2026-06-03** | **F-07 緊急連絡先: 電話通知 (`phone`) を廃止し、LINE 注記を v1.1 に更新 (オーナー承認 2026-06-03)。v1.0 では実送信は `email` のみ (変更なし)。`ContactType` enum から `.phone` case を完全撤去 (選択 UI / 入力フィールド / バリデーション / 関連テスト含む)。`line` は登録のみで残置し、coming soon 注記文言を「v0.2 で対応予定」→「v1.1 で対応予定」に更新 (実送信は引き続きしない)。LINE 本実装 (Messaging API・公式アカウント方式) は v1.1 へ先送り (LINE Notify が 2025/3 終了のため)。backend は変更不要: `contact_type` カラムは後方互換のため維持、`fromStoredValue` は未知値 (旧 `phone` レコード含む) を email にフォールバック。§F-07 / §4.1 / §15.3 を改訂。仕様メモ: `~/.company/secretary/notes/2026-06-03-hibix-emergency-contact-phone-removal-design.md`。MoodLevel / 課金 / 通知タイマー仕様は変更なし。** |
 | **v2.2.0** | **2026-05-17** | **STEP7 Codex設計レビューゲート対応: §2.2/§2.4 に App Attest(`DCAppAttestService`)/ StoreKit JWS サーバー検証 / `jose@5.9.6` 追加。§4.2 に `app_attest_keys` / `attest_challenges` / `storekit_transactions` 3テーブル新設、`notification_logs` に `contact_id`(M-05 per-contact retry)+ `retry_count` 追加、`idx_users_alert_target` 部分 index(M-02 Cron 絞り込み)を追加。§6 F-11 に削除取消権(48h以内)を追加。§8.1 を認証ヘッダ 4 種(App Attest)+ エラーコード一覧 + checkin atomic UPDATE(M-01)に書き換え。§8.3 から `is_pro` 受付削除(サーバー派生値化)。§8.4 contacts を `batch()` で原子化(M-04)。§8.5 に削除リクエスト中 409 `DELETION_PENDING`(M-03)。§8.6 Cron を SQL 集約 + per-contact retry に書き換え。§8.7-§8.10 新設(`/api/attest/{challenge,register}` / `/api/storekit/verify` / `/api/account/cancel-deletion`)。旧 §8.7 health は §8.11 にリナンバー。§10.3 に JWS / 公開鍵保存メモ追加。§10.7 新設(App Attest 検証フロー + 端末非対応フォールバック)。§13 Sprint 4/5 を C-01/C-02 込みに拡張。iOS 側仕様(GRDB / Keychain / 通知 UI / ピクセルカレンダー)は変更なし。本書** |
+| **v2.7.0** | **2026-07-11** | **課金モデルをハイブリッドに刷新（オーナー承認 2026-07-11）。自動更新サブスク `com.shimogun.hibix.pro.monthly`（7日間無料トライアル → ¥480/月）を新設し、買い切り `com.shimogun.hibix.pro.lifetime` を ¥2,800 → ¥5,800 に改定。`isPro = 有効サブ（トライアル含む）or lifetime所有` に判定拡張（`StoreKitProduct.allIDs`）。§5.3 を書き換え、§14 の「サブスク商品 対象外」を解除。ペイウォールをトライアル先頭＋買い切り併置に改修し 3.1.2 コンプラ表記（自動更新/解約/EULA/プライバシーリンク）を追加。設定に「Proにアップグレード」常設CTA追加、オンボの「サブスクなし」「¥2,800直書き」を撤去し `displayPrice` 動的化。デッドコード `FeatureGate` を撤去（境界は `isPro` 直参照で統一）。**⚠️ backend 対応必須**: サブスクの見守り（安否通知）はサーバー `is_pro` 依存だが現行 backend はサブJWSを拒否・失効を扱えないため、`/api/storekit/verify` 拡張＋ App Store Server Notifications V2 が別途必要（hibix-backend タスク）。実装スペック: `~/.company/aso-consulting/2026-07-11-hibix-subscription-implementation-spec.md`。段階リリース（Phase1=iOS先行）。** |
 | **v2.6.0** | **2026-06-27** | **v1.1 LINE通知（C案: email/LINE 同列）iOS実装（タスク#10）。backend は本番稼働済み（PR #5・C案）。(1) contacts/settings のサーバー同期を実装（従来は `.contacts`/`.settings` 定義済みだが呼び出しゼロ）。GRDB Migration v3 (`v3_emergency_contacts_add_line_sync`) で `server_id`（サーバー contact UUID）と `line_link_status`（unlinked/pending/linked）を追加。PUT /api/contacts は contact_type/optional email/安定ID upsert（id 省略時はキー無し）に契約更新、レスポンス id を sort_order 順 index でローカルへ書き戻し。(2) `ContactsSyncService`（保存/削除/起動時に同期・失敗はサイレント+resync）と `LineLinkService`（issue-code/status・server_id 未取得なら先に同期）を新設。(3) 編集画面に LINE 連携導線（連携コード6桁表示・友だち追加リンク・ShareLink 共有・status 約4秒ポーリング・失効再発行）を統合し coming-soon 注記を撤去。`ContactType.isDeliveredInV01` 撤去。(4) gentle/daily 切替・最後の email 連絡先削除/種別変更を UI で先回りブロック（サーバー M-01 EMAIL_CONTACT_REQUIRED）。LINE の `expires_at`/`code_expires_at` は UNIX epoch 秒（Int デコード）。実装計画: `docs/superpowers/plans/2026-06-27-v1.1-line-ios.md` / 設計: `docs/superpowers/specs/2026-06-27-v1.1-line-notification-design.md`。MoodLevel / 課金 / 通知タイマー仕様は変更なし。** |
 
 ### 15.4 関連メモリ

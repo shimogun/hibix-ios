@@ -1,21 +1,24 @@
 # StoreKit 2 / 課金規約
 
-## 商品ID(変更不可)
+## 商品ID(PRD §5.3・v1.1 でハイブリッド化)
 
 | 商品ID | 種類 | 価格 |
 |---|---|---|
-| `com.shimogun.hibix.pro.lifetime` | Non-Consumable | ¥2,800(Tier 18) |
+| `com.shimogun.hibix.pro.monthly` | Auto-Renewable Subscription | ¥480/月(7日間無料トライアル) |
+| `com.shimogun.hibix.pro.lifetime` | Non-Consumable | ¥5,800 |
 
-**この商品IDは PRD §5.3 で確定**。コード内では必ず定数として宣言:
+**この商品IDは PRD §5.3 で確定**。コード内では必ず定数として宣言(実体は `StoreKitProduct`):
 
 ```swift
-enum HibixProducts {
-    static let lifetimeProID = "com.shimogun.hibix.pro.lifetime"
-    static let allProductIDs: [String] = [lifetimeProID]
+enum StoreKitProduct {
+    static let proMonthlyID = "com.shimogun.hibix.pro.monthly"
+    static let proLifetimeID = "com.shimogun.hibix.pro.lifetime"
+    static let allIDs: Set<String> = [proMonthlyID, proLifetimeID]
+    static func grantsPro(_ productID: String) -> Bool { allIDs.contains(productID) }
 }
 ```
 
-商品ID文字列を複数箇所にハードコードしない。
+商品ID文字列を複数箇所にハードコードしない。エンタイトルメント判定は `StoreKitProduct.grantsPro(_:)` を使い、`isPro = 有効サブ(トライアル含む) or lifetime所有`。
 
 ## EntitlementManager 設計
 
@@ -144,8 +147,8 @@ struct FeatureGate {
 - **VerificationResult.unverified の信頼**(必ず checkVerified を通す)
 - **transaction.finish() の省略**(消費されないトランザクションが残る)
 - **`.userCancelled` でのエラー表示**(ユーザー操作なので静かに戻す)
-- **サブスク商品の追加**(v0.1スコープ外・PRD §14)
-- **レシート検証のサーバー実装**(v0.1ではサーバーは Entitlement を信頼するだけ・PRD §6 F-13)
+- **PRD §5.3 外の商品IDの追加**(サブスク `pro.monthly` / 買い切り `pro.lifetime` の2種のみ。年額等の追加は PRD 更新が先)
+- ⚠️ **サブスクはサーバー連携に注意**: 見守り(安否通知)はサーバー `is_pro` 依存。backend が `/api/storekit/verify` でサブJWS・`expiresDate` を受理し、App Store Server Notifications V2 で失効追従する必要がある(hibix-backend 側)。iOS単体ではサブの見守りは機能しない。
 
 ## 共通参照
 

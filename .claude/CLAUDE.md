@@ -67,8 +67,7 @@ PRD §13 Sprint をそのまま採用。
 - 第三者解析SDK(Firebase Analytics / Mixpanel / Sentry等)の追加
 - 第三者広告SDKの追加
 - `mood_level`、`memo`、ピクセル履歴のサーバー送信(`docs/PRD.md` §4.2 厳守)
-- `com.shimogun.hibix.pro.lifetime` 以外の商品ID追加(`docs/PRD.md` §5.3 厳守)
-- 月額/サブスク商品の実装(v0.1スコープ外・`docs/PRD.md` §14)
+- `docs/PRD.md` §5.3 に定義された商品ID(`pro.lifetime` / `pro.monthly`)**以外**の商品ID追加(§5.3 厳守)
 - App Sign-In実装(v0.1スコープ外)
 - ウィジェット/Apple Watch/Web招待リンク等の対象外機能
 - `xcodebuild archive -configuration Release` 実行(リリースビルドは手動)

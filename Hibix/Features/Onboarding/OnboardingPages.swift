@@ -152,24 +152,54 @@ struct OnboardingAppLockPage: View {
 
 // MARK: - ⑧ Pro
 
+/// オンボ Pro ページの価格表示。StoreKit から動的取得し注入する（ハードコードしない）。
+/// 取得失敗時は nil を渡し、数字なしの文言にフォールバックする。
+struct OnboardingProPricing: Equatable, Sendable {
+    /// 例: "¥480"
+    let monthlyPrice: String
+    /// 例: "¥5,800"
+    let lifetimePrice: String
+}
+
 struct OnboardingProPage: View {
+    /// 価格（動的取得）。未取得時は nil。
+    let pricing: OnboardingProPricing?
+
+    init(pricing: OnboardingProPricing? = nil) {
+        self.pricing = pricing
+    }
+
     var body: some View {
         OnboardingPageScaffold(
-            title: "買い切りで、ずっと使える",
-            subtitle: "サブスクなし。\n一度の購入で全機能を解放。"
+            title: "まずは7日間、無料でお試し",
+            subtitle: "気に入ったら続けられます。\nずっと使う買い切りも選べます。"
         ) {
             EmptyView()
         } extra: {
             VStack(spacing: 14) {
                 ProCompareTable()
-                Text("¥2,800")
-                    .font(.system(size: 34, weight: .heavy))
+                priceLabel
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var priceLabel: some View {
+        if let pricing {
+            VStack(spacing: 4) {
+                Text("7日間無料 → 月\(pricing.monthlyPrice)")
+                    .font(.system(size: 22, weight: .heavy))
                     .foregroundStyle(Color.hibixNavy)
-                + Text("  買い切り")
+                Text("または買い切り \(pricing.lifetimePrice)")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(Color.hibixSubText)
             }
+            .multilineTextAlignment(.center)
+        } else {
+            Text("7日間無料ではじめられます")
+                .font(.system(size: 22, weight: .heavy))
+                .foregroundStyle(Color.hibixNavy)
         }
     }
 }

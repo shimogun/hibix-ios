@@ -5,13 +5,13 @@
   ],
   "products" : [
     {
-      "displayPrice" : "2800",
+      "displayPrice" : "5800",
       "familyShareable" : false,
       "internalID" : "1234567890",
       "localizations" : [
         {
-          "description" : "すべての見守りモード解禁、緊急連絡先メール通知、Face ID ロック、全期間のピクセルカレンダー。買い切り一度のみ。",
-          "displayName" : "Hibix Pro",
+          "description" : "すべての見守りモード、緊急連絡先メール通知、Face ID ロック、全期間のピクセルカレンダー。買い切り一度のみ、ずっと使えます。",
+          "displayName" : "Hibix Pro（買い切り）",
           "locale" : "ja_JP"
         }
       ],
@@ -73,7 +73,47 @@
     ]
   },
   "subscriptionGroups" : [
+    {
+      "id" : "20000001",
+      "localizations" : [
 
+      ],
+      "name" : "Hibix Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "480",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "20000002",
+          "introductoryOffer" : {
+            "internalID" : "20000003",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "すべての見守りモード、緊急連絡先メール通知、Face ID ロック、全期間のピクセルカレンダー。まずは7日間無料。",
+              "displayName" : "Hibix Pro（月額）",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "com.shimogun.hibix.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Hibix Pro Monthly",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
   ],
   "version" : {
     "major" : 4,

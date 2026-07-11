@@ -5,11 +5,13 @@ import SwiftUI
 struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
     @State private var isHelpPresented: Bool = false
+    @State private var isPaywallPresented: Bool = false
     @Bindable private var entitlement: EntitlementManager
     @Environment(\.openURL) private var openURL
     let onDismiss: () -> Void
 
     private let dependencies: AppDependencies
+    private let makePaywallViewModel: () -> PaywallViewModel
 
     init(dependencies: AppDependencies, onDismiss: @escaping () -> Void) {
         _viewModel = State(initialValue: SettingsViewModel(
@@ -18,6 +20,8 @@ struct SettingsView: View {
         ))
         self.entitlement = dependencies.entitlementManager
         self.dependencies = dependencies
+        let manager = dependencies.entitlementManager
+        self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
         self.onDismiss = onDismiss
     }
 
@@ -44,6 +48,13 @@ struct SettingsView: View {
                 OnboardingFlow(dependencies: dependencies, mode: .review, onClose: {
                     isHelpPresented = false
                 })
+            }
+            .sheet(isPresented: $isPaywallPresented) {
+                PaywallView(
+                    viewModel: makePaywallViewModel(),
+                    onPurchaseCompleted: { isPaywallPresented = false },
+                    onDismiss: { isPaywallPresented = false }
+                )
             }
             .task {
                 await viewModel.load()
@@ -88,6 +99,23 @@ struct SettingsView: View {
                 }
             }
             .accessibilityElement(children: .combine)
+
+            if !entitlement.isPro {
+                Button {
+                    isPaywallPresented = true
+                } label: {
+                    HStack {
+                        Label("Pro にアップグレード", systemImage: "sparkles")
+                            .foregroundStyle(.tint)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .accessibilityHint("7日間無料トライアルや購入プランを表示します")
+            }
         }
     }
 

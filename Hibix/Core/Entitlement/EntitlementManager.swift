@@ -45,8 +45,9 @@ final class EntitlementManager: EntitlementProviding {
         var detectedPro = false
         for await result in Transaction.currentEntitlements {
             if case .verified(let transaction) = result,
-               transaction.productID == StoreKitProduct.proLifetimeID,
+               StoreKitProduct.grantsPro(transaction.productID),
                transaction.revocationDate == nil {
+                // 有効なサブスク（トライアル中含む）はここに現れ、失効すると外れる。
                 detectedPro = true
                 await onVerifyTransaction(result)
             }
@@ -58,7 +59,7 @@ final class EntitlementManager: EntitlementProviding {
     /// `VerificationResult` を受け取って `jwsRepresentation` をサーバーに送る。
     func handlePurchase(_ verification: VerificationResult<Transaction>) async {
         guard case .verified(let transaction) = verification,
-              transaction.productID == StoreKitProduct.proLifetimeID else { return }
+              StoreKitProduct.grantsPro(transaction.productID) else { return }
         await onVerifyTransaction(verification)
         await applyEntitlement(true)
     }

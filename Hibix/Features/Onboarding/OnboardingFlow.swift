@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import os.log
 
@@ -9,6 +10,8 @@ struct OnboardingFlow: View {
 
     @State private var viewModel: OnboardingViewModel
     @State private var pageIndex: Int = 0
+    /// Pro ページの動的価格。StoreKit 取得成功時のみ非 nil。
+    @State private var proPricing: OnboardingProPricing?
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Onboarding")
     /// firstRun=9ページ(0..8) / review=8ページ(0..7、開始ページ⑨を除外)
@@ -75,7 +78,7 @@ struct OnboardingFlow: View {
                 OnboardingSafetyPage().tag(4)
                 OnboardingPrivacyPage().tag(5)
                 OnboardingAppLockPage().tag(6)
-                OnboardingProPage().tag(7)
+                OnboardingProPage(pricing: proPricing).tag(7)
                 if mode != .review {
                     OnboardingStartPage(onSelectMode: { selected in
                         Task { await viewModel.selectStartMode(selected) }
@@ -104,6 +107,9 @@ struct OnboardingFlow: View {
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .hibixWatercolorBackground()
+        .task {
+            await loadProPricing()
+        }
         .sheet(isPresented: $bindable.isPaywallPresented) {
             PaywallView(
                 viewModel: PaywallViewModel(entitlement: dependencies.entitlementManager),
@@ -132,5 +138,23 @@ struct OnboardingFlow: View {
     private func advance() {
         guard pageIndex < pageCount - 1 else { return }
         pageIndex += 1
+    }
+
+    /// StoreKit から Pro ページ用の価格を取得する。失敗時は nil のままフォールバック文言。
+    private func loadProPricing() async {
+        guard proPricing == nil else { return }
+        do {
+            let products = try await Product.products(for: Array(StoreKitProduct.allIDs))
+            guard let monthly = products.first(where: { $0.id == StoreKitProduct.proMonthlyID }),
+                  let lifetime = products.first(where: { $0.id == StoreKitProduct.proLifetimeID }) else {
+                return
+            }
+            proPricing = OnboardingProPricing(
+                monthlyPrice: monthly.displayPrice,
+                lifetimePrice: lifetime.displayPrice
+            )
+        } catch {
+            OnboardingFlow.logger.error("Pro pricing fetch failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
