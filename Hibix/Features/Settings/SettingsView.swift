@@ -11,7 +11,6 @@ struct SettingsView: View {
     let onDismiss: () -> Void
 
     private let dependencies: AppDependencies
-    private let makePaywallViewModel: () -> PaywallViewModel
 
     init(dependencies: AppDependencies, onDismiss: @escaping () -> Void) {
         _viewModel = State(initialValue: SettingsViewModel(
@@ -20,8 +19,6 @@ struct SettingsView: View {
         ))
         self.entitlement = dependencies.entitlementManager
         self.dependencies = dependencies
-        let manager = dependencies.entitlementManager
-        self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
         self.onDismiss = onDismiss
     }
 
@@ -51,7 +48,7 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $isPaywallPresented) {
                 PaywallView(
-                    viewModel: makePaywallViewModel(),
+                    entitlement: entitlement,
                     onPurchaseCompleted: { isPaywallPresented = false },
                     onDismiss: { isPaywallPresented = false }
                 )

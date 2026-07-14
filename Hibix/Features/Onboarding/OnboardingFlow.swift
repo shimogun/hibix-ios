@@ -112,7 +112,7 @@ struct OnboardingFlow: View {
         }
         .sheet(isPresented: $bindable.isPaywallPresented) {
             PaywallView(
-                viewModel: PaywallViewModel(entitlement: dependencies.entitlementManager),
+                entitlement: dependencies.entitlementManager,
                 onPurchaseCompleted: {
                     Task { await viewModel.handlePurchaseCompleted() }
                 },

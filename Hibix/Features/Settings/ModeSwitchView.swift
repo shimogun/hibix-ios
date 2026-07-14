@@ -11,7 +11,6 @@ struct ModeSwitchView: View {
     @State private var pendingEmailContactAdd = false
     @Bindable private var entitlement: EntitlementManager
     private let dependencies: AppDependencies
-    private let makePaywallViewModel: () -> PaywallViewModel
 
     init(dependencies: AppDependencies) {
         _viewModel = State(initialValue: ModeSwitchViewModel(
@@ -27,8 +26,6 @@ struct ModeSwitchView: View {
         ))
         self.entitlement = dependencies.entitlementManager
         self.dependencies = dependencies
-        let manager = dependencies.entitlementManager
-        self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
     }
 
     var body: some View {
@@ -61,7 +58,7 @@ struct ModeSwitchView: View {
         }
         .sheet(isPresented: $bindable.isPaywallPresented) {
             PaywallView(
-                viewModel: makePaywallViewModel(),
+                entitlement: entitlement,
                 onPurchaseCompleted: {
                     viewModel.isPaywallPresented = false
                 },

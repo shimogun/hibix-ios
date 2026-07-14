@@ -6,13 +6,9 @@ struct AppLockSettingsView: View {
     @Bindable private var appLock: AppLockManager
     @Bindable private var entitlement: EntitlementManager
     @State private var isPaywallPresented: Bool = false
-    private let makePaywallViewModel: () -> PaywallViewModel
-
     init(dependencies: AppDependencies) {
         self.appLock = dependencies.appLockManager
         self.entitlement = dependencies.entitlementManager
-        let manager = dependencies.entitlementManager
-        self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
     }
 
     var body: some View {
@@ -56,7 +52,7 @@ struct AppLockSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isPaywallPresented) {
             PaywallView(
-                viewModel: makePaywallViewModel(),
+                entitlement: entitlement,
                 onPurchaseCompleted: {
                     isPaywallPresented = false
                 },

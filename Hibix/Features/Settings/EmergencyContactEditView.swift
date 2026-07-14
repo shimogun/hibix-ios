@@ -7,7 +7,7 @@ struct EmergencyContactEditView: View {
 
     @State private var viewModel: EmergencyContactEditViewModel
     @State private var lineLinkTarget: LineLinkTarget?
-    private let makePaywallViewModel: () -> PaywallViewModel
+    private let entitlement: EntitlementManager
     private let lineLinkService: LineLinkService
     let onSaved: () -> Void
     let onCancel: () -> Void
@@ -25,8 +25,7 @@ struct EmergencyContactEditView: View {
             contactsSync: dependencies.contactsSyncService,
             settings: dependencies.settingsRepository
         ))
-        let manager = dependencies.entitlementManager
-        self.makePaywallViewModel = { PaywallViewModel(entitlement: manager) }
+        self.entitlement = dependencies.entitlementManager
         self.lineLinkService = dependencies.lineLinkService
         self.onSaved = onSaved
         self.onCancel = onCancel
@@ -112,7 +111,7 @@ struct EmergencyContactEditView: View {
             }
             .sheet(isPresented: $bindable.isPaywallPresented) {
                 PaywallView(
-                    viewModel: makePaywallViewModel(),
+                    entitlement: entitlement,
                     onPurchaseCompleted: {
                         viewModel.isPaywallPresented = false
                     },

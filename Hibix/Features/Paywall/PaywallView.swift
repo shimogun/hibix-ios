@@ -3,9 +3,21 @@ import SwiftUI
 /// PRD §5.6 / §6 F-12 のペイウォール画面。
 /// v1.1: 7日間無料トライアル（¥480/月）を主役に、買い切り lifetime（¥5,800）を併置。
 struct PaywallView: View {
-    @Bindable var viewModel: PaywallViewModel
+    /// VM は View が `@State` で1度だけ所有する。
+    /// 呼び出し側（`.sheet` クロージャ）でインライン生成すると body 再評価のたびに
+    /// 別インスタンスが作られ、`.loaded` になった VM と画面が観測する VM が食い違って
+    /// スピナーが固着する（既知バグの再発防止）。
+    @State private var viewModel: PaywallViewModel
     let onPurchaseCompleted: () -> Void
     let onDismiss: () -> Void
+
+    init(entitlement: EntitlementProviding,
+         onPurchaseCompleted: @escaping () -> Void,
+         onDismiss: @escaping () -> Void) {
+        _viewModel = State(initialValue: PaywallViewModel(entitlement: entitlement))
+        self.onPurchaseCompleted = onPurchaseCompleted
+        self.onDismiss = onDismiss
+    }
 
     /// サブスク審査（App Store 3.1.2）に必須の規約リンク。
     /// ※最終URLはオーナー確認（暫定: 特商法表記と同ドメイン運用）。
