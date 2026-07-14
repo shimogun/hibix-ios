@@ -35,15 +35,20 @@ final class PaywallViewModel {
     private(set) var loadState: LoadState = .idle
     private(set) var purchaseState: PurchaseState = .idle
 
-    @ObservationIgnored private let entitlement: EntitlementManager
+    @ObservationIgnored private let entitlement: EntitlementProviding
+    /// 購入履歴を App Store と強制同期する処理（既定は `AppStore.sync()`）。
+    /// テストで sync の throw を再現するため注入可能にしている。
+    @ObservationIgnored private let syncAppStore: @Sendable () async throws -> Void
     /// 購入用に保持する実 Product（View には display モデルのみ渡す）。
     @ObservationIgnored private var subscriptionProduct: Product?
     @ObservationIgnored private var lifetimeProduct: Product?
 
     private static let logger = Logger(subsystem: "com.shimogun.hibix", category: "Paywall")
 
-    init(entitlement: EntitlementManager) {
+    init(entitlement: EntitlementProviding,
+         syncAppStore: @escaping @Sendable () async throws -> Void = { try await AppStore.sync() }) {
         self.entitlement = entitlement
+        self.syncAppStore = syncAppStore
     }
 
     func loadProducts() async {
@@ -101,17 +106,35 @@ final class PaywallViewModel {
 
     func restorePurchases() async {
         purchaseState = .restoring
+
+        // `AppStore.sync()` は App Store と購入履歴を強制同期するが、購入自体は
+        // sync 無しでも `Transaction.currentEntitlements` から読める。Sandbox では
+        // sync が良性理由で throw することがあるため、throw を復元失敗とはみなさず、
+        // 最終判定は必ず `entitlement.refresh()`（＝currentEntitlements）に委ねる。
+        var syncFailed = false
         do {
-            try await AppStore.sync()
-            await entitlement.refresh()
-            if entitlement.isPro {
-                purchaseState = .completed
-            } else {
-                purchaseState = .failed(message: "購入履歴がありません")
-            }
+            try await syncAppStore()
         } catch {
-            Self.logger.error("Restore failed: \(error.localizedDescription, privacy: .public)")
+            // 認証シートをユーザーが閉じた場合はエラー表示せず静かに戻す（.userCancelled 規約）。
+            if let skError = error as? StoreKitError, case .userCancelled = skError {
+                Self.logger.info("Restore cancelled by user during AppStore.sync")
+                purchaseState = .cancelledByUser
+                return
+            }
+            syncFailed = true
+            Self.logger.error("AppStore.sync failed during restore (falling back to currentEntitlements): \(error.localizedDescription, privacy: .public)")
+        }
+
+        await entitlement.refresh()
+        if await entitlement.isPro {
+            // sync が throw しても currentEntitlements に購入があれば復元成功。
+            purchaseState = .completed
+        } else if syncFailed {
+            // 同期失敗かつ購入未検出のときだけ本当の失敗として再試行を促す。
             purchaseState = .failed(message: "復元に失敗しました。時間を置いて再度お試しください")
+        } else {
+            // 同期成功・購入なし＝購入履歴が無い（エラーではない・F-14）。
+            purchaseState = .failed(message: "購入履歴がありません")
         }
     }
 
