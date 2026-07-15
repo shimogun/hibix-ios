@@ -64,7 +64,7 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Image(systemName: "sparkles")
+            Image(systemName: "gift.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.tint)
                 .accessibilityHidden(true)
