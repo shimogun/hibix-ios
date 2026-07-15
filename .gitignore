@@ -6,3 +6,6 @@ DerivedData/
 .swiftpm/
 .worktrees/
 .superpowers/
+
+# 配布物のアーカイブはリポジトリに含めない（中身が追跡されず露出事故につながるため）
+*.zip
