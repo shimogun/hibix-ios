@@ -28,7 +28,7 @@
 | 最低OSバージョン | iOS 17.0 |
 | ローカル永続化 | GRDB.swift |
 | 認証方式 | 匿名UUID（iOS Keychain で iCloud 同期） |
-| 課金 | StoreKit 2、¥5,800 買い切り商品 1点 |
+| 課金 | StoreKit 2、ハイブリッド（買い切り¥5,800 ＋ 月額¥480/月・7日無料トライアル） |
 | バックエンド | Cloudflare Workers（Wrangler 3.x / TypeScript 5.x） |
 | サーバーDB | Cloudflare D1（SQLite） |
 | メール送信 | Resend |
