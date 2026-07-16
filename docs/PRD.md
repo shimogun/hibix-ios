@@ -28,13 +28,13 @@
 | 最低OSバージョン | iOS 17.0 |
 | ローカル永続化 | GRDB.swift |
 | 認証方式 | 匿名UUID（iOS Keychain で iCloud 同期） |
-| 課金 | StoreKit 2、¥2,800 買い切り商品 1点 |
+| 課金 | StoreKit 2、¥5,800 買い切り商品 1点 |
 | バックエンド | Cloudflare Workers（Wrangler 3.x / TypeScript 5.x） |
 | サーバーDB | Cloudflare D1（SQLite） |
 | メール送信 | Resend |
 | 定期実行 | Cloudflare Cron Triggers（15分間隔） |
 | ローンチ言語 | 日本語のみ |
-| 通貨/価格 | JPY ¥2,800（PPP は v0.2 以降） |
+| 通貨/価格 | JPY ¥5,800（PPP は v0.2 以降） |
 
 ### 0.4 用語定義
 
@@ -56,8 +56,8 @@
 |---|---|
 | 1行コンセプト | 「毎日のひとタップが、自分のメンタル日記になり、誰かを安心させる」 |
 | 主要ユースケース | 自己メンタル記録 / 一人暮らしの安否確認 / 離れた親への見守りギフト |
-| 差別化 | メンタル日記 × 安否確認のハイブリッド、買い切り¥2,800、データ100%ローカル |
-| 価格 | 無料 + 買い切りPro ¥2,800（IAP 1点のみ） |
+| 差別化 | メンタル日記 × 安否確認のハイブリッド、買い切り¥5,800、データ100%ローカル |
+| 価格 | 無料 + サブスクPro ¥480/月（7日無料）+ 買い切りPro ¥5,800（§5.3 参照） |
 | 対象 OS | iOS 17.0 以降 |
 
 ---
@@ -916,13 +916,13 @@ actor EntitlementManager {
 
 **ペイウォール画面（`PaywallView`）構成**:
 - ヘッダー: 「Hibix Pro」
-- 価格: ¥2,800 一度きり
+- 価格: ¥5,800 一度きり
 - ベネフィット 4 行:
   1. すべての見守りモード解禁
   2. 緊急連絡先メール通知
   3. Face ID ロック
   4. 全期間のピクセルカレンダー
-- CTA: 「¥2,800 で購入」（大）
+- CTA: 「¥5,800 で購入」（大）
 - サブテキスト: 「購入を復元」リンク
 - 下部: 利用規約・プライバシーポリシーリンク
 
@@ -1828,7 +1828,7 @@ Sprint 9: テスト + ベータ準備
 3. MVP は安否機能まで含む 16 機能に絞り込み（参考PRD v1.0 の 25 機能から削減）
 4. 無料/有料境界:
    - 無料: 気分タップ・メモ500文字・ピクセル直近1年（直近365日ローリングウィンドウ）・通知・データ削除
-   - 有料 (¥2,800): 3モード解禁・緊急連絡先メール・Face IDロック・2段階リマインダー・ピクセル全期間
+   - 有料 (¥5,800): 3モード解禁・緊急連絡先メール・Face IDロック・2段階リマインダー・ピクセル全期間
 5. マーケ・ブランド・KPI 章は意図的に除外（コーディング判断に不要）
 6. **v2.1 で バックエンドを Cloudflare Workers + D1 + Hono に正規化**（設計書 v0.7 §15 引き継ぎ・コスト青天井防止と無料スタートのため）
 
@@ -1851,6 +1851,8 @@ Sprint 9: テスト + ベータ準備
 | **v2.2.0** | **2026-05-17** | **STEP7 Codex設計レビューゲート対応: §2.2/§2.4 に App Attest(`DCAppAttestService`)/ StoreKit JWS サーバー検証 / `jose@5.9.6` 追加。§4.2 に `app_attest_keys` / `attest_challenges` / `storekit_transactions` 3テーブル新設、`notification_logs` に `contact_id`(M-05 per-contact retry)+ `retry_count` 追加、`idx_users_alert_target` 部分 index(M-02 Cron 絞り込み)を追加。§6 F-11 に削除取消権(48h以内)を追加。§8.1 を認証ヘッダ 4 種(App Attest)+ エラーコード一覧 + checkin atomic UPDATE(M-01)に書き換え。§8.3 から `is_pro` 受付削除(サーバー派生値化)。§8.4 contacts を `batch()` で原子化(M-04)。§8.5 に削除リクエスト中 409 `DELETION_PENDING`(M-03)。§8.6 Cron を SQL 集約 + per-contact retry に書き換え。§8.7-§8.10 新設(`/api/attest/{challenge,register}` / `/api/storekit/verify` / `/api/account/cancel-deletion`)。旧 §8.7 health は §8.11 にリナンバー。§10.3 に JWS / 公開鍵保存メモ追加。§10.7 新設(App Attest 検証フロー + 端末非対応フォールバック)。§13 Sprint 4/5 を C-01/C-02 込みに拡張。iOS 側仕様(GRDB / Keychain / 通知 UI / ピクセルカレンダー)は変更なし。本書** |
 | **v2.7.0** | **2026-07-11** | **課金モデルをハイブリッドに刷新（オーナー承認 2026-07-11）。自動更新サブスク `com.shimogun.hibix.pro.monthly`（7日間無料トライアル → ¥480/月）を新設し、買い切り `com.shimogun.hibix.pro.lifetime` を ¥2,800 → ¥5,800 に改定。`isPro = 有効サブ（トライアル含む）or lifetime所有` に判定拡張（`StoreKitProduct.allIDs`）。§5.3 を書き換え、§14 の「サブスク商品 対象外」を解除。ペイウォールをトライアル先頭＋買い切り併置に改修し 3.1.2 コンプラ表記（自動更新/解約/EULA/プライバシーリンク）を追加。設定に「Proにアップグレード」常設CTA追加、オンボの「サブスクなし」「¥2,800直書き」を撤去し `displayPrice` 動的化。デッドコード `FeatureGate` を撤去（境界は `isPro` 直参照で統一）。**⚠️ backend 対応必須**: サブスクの見守り（安否通知）はサーバー `is_pro` 依存だが現行 backend はサブJWSを拒否・失効を扱えないため、`/api/storekit/verify` 拡張＋ App Store Server Notifications V2 が別途必要（hibix-backend タスク）。実装スペック: `~/.company/aso-consulting/2026-07-11-hibix-subscription-implementation-spec.md`。段階リリース（Phase1=iOS先行）。** |
 | **v2.6.0** | **2026-06-27** | **v1.1 LINE通知（C案: email/LINE 同列）iOS実装（タスク#10）。backend は本番稼働済み（PR #5・C案）。(1) contacts/settings のサーバー同期を実装（従来は `.contacts`/`.settings` 定義済みだが呼び出しゼロ）。GRDB Migration v3 (`v3_emergency_contacts_add_line_sync`) で `server_id`（サーバー contact UUID）と `line_link_status`（unlinked/pending/linked）を追加。PUT /api/contacts は contact_type/optional email/安定ID upsert（id 省略時はキー無し）に契約更新、レスポンス id を sort_order 順 index でローカルへ書き戻し。(2) `ContactsSyncService`（保存/削除/起動時に同期・失敗はサイレント+resync）と `LineLinkService`（issue-code/status・server_id 未取得なら先に同期）を新設。(3) 編集画面に LINE 連携導線（連携コード6桁表示・友だち追加リンク・ShareLink 共有・status 約4秒ポーリング・失効再発行）を統合し coming-soon 注記を撤去。`ContactType.isDeliveredInV01` 撤去。(4) gentle/daily 切替・最後の email 連絡先削除/種別変更を UI で先回りブロック（サーバー M-01 EMAIL_CONTACT_REQUIRED）。LINE の `expires_at`/`code_expires_at` は UNIX epoch 秒（Int デコード）。実装計画: `docs/superpowers/plans/2026-06-27-v1.1-line-ios.md` / 設計: `docs/superpowers/specs/2026-06-27-v1.1-line-notification-design.md`。MoodLevel / 課金 / 通知タイマー仕様は変更なし。** |
+
+| v2.7.1 | 2026-07-17 | ¥2,800→¥5,800 改定を全ドキュメントに全体反映（§5.3 整合）。§0.3 技術スタック表 / §1 プロダクト要約（差別化・価格）/ §5.2 ペイウォール価格表記・CTA / §15.2 無料有料境界 に残存していた買い切り価格 ¥2,800 を ¥5,800 へ統一。lifetime の正は §5.3（ハイブリッド課金: サブスク¥480/月 + 買い切り¥5,800）。§15.3 の変更履歴・v0.1/v2.0 時点の記録は事実として据え置き。商品ID・課金ロジック・データモデル・iOS 側仕様は変更なし（表記整合のみ）。 |
 
 ### 15.4 関連メモリ
 
